@@ -10,7 +10,6 @@ statement:
     | whileStatement
     | printStatement
     | threadCreate
-    | threadStart
     | threadJoin
     | globalDecl
     | lockCreate
@@ -28,11 +27,11 @@ assignment:
     ;
 
 ifStatement:
-    SI expr INICIAMOS block CERRAMOS COLON_PAREN
+    SI expr beginScope block endScope COLON_PAREN
     ;
 
 whileStatement:
-    DURANTE expr INICIAMOS block CERRAMOS COLON_PAREN
+    DURANTE expr beginScope block endScope COLON_PAREN
     ;
 
 printStatement:
@@ -40,15 +39,11 @@ printStatement:
     ;
 
 threadCreate:
-    HILO ID ASSIGN INICIAMOS block CERRAMOS COLON_PAREN
-    ;
-
-threadStart:
-    EMPZAMOS ID COLON_PAREN
+    HILO block
     ;
 
 threadJoin:
-    ESPERAMOS ID COLON_PAREN
+    ESPERAMOS COLON_PAREN
     ;
 
 globalDecl:
@@ -68,7 +63,7 @@ lockGet:
     ;
 
 scopeBlock:
-    INICIAMOS block CERRAMOS COLON_PAREN
+    beginScope block endScope COLON_PAREN
     ;
 
 block: (statement)*;
@@ -99,6 +94,12 @@ primaryExpr:
     | LPAREN expr RPAREN
     ;
 
+beginScope:
+    INICIAMOS | O_BRACE;
+
+endScope:
+    CERRAMOS | C_BRACE;
+
 arrayLiteral:
     LBRACKET (expr (COMMA expr)*)? RBRACKET
     ;
@@ -123,6 +124,9 @@ LIBERAR: 'liberar';
 OBTENER: 'obtener';
 INICIAMOS: 'iniciamos';
 CERRAMOS: 'cerramos';
+O_BRACE: '{';
+C_BRACE: '}';
+
 
 VERDAD: 'verdad';
 MENTIRA: 'mentira';
