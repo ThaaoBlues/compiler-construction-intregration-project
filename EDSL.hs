@@ -97,9 +97,9 @@ data Stmt = Declaration Type String
 
 -- Parser for type identifiers
 typeIdentifier :: Parser Type
-typeIdentifier = (reserved "entero" >> return Entero)
-            <|> (reserved "booleana" >> return Booleana)
-            <|> (reserved "array" >> return Array)
+typeIdentifier = (Entero <$ reserved "entero")
+            <|> (Booleana <$ reserved "booleana")
+            <|> (Array <$ reserved "array")
 
 -- Parser for primary expressions
 primaryExpr :: Parser Expr
@@ -108,73 +108,64 @@ primaryExpr = try (IntLit <$> integer)
           <|> try (BoolLit False <$ reserved "mentira")
           <|> try (Var <$> identifier)
           <|> try arrayLiteral
-          <|> (symbol "¡" >> expr <* symbol "!" >>= \e -> return (Paren e))
+          <|> (Paren <$> (symbol "¡" *> expr) <* symbol "!")
 
 arrayLiteral :: Parser Expr
-arrayLiteral = do
-  symbol "["
-  exprs <- commaSep expr
-  symbol "]"
-  return $ ArrayLit exprs
+arrayLiteral = (ArrayLit <$ symbol "[") <*> (commaSep expr <* symbol "]")
 
 -- Parser for unary expressions
 unaryExpr :: Parser Expr
-unaryExpr = (do 
-                reservedOp "~:(" -- NOT
-                UnOp Not <$> unaryExpr)
-            <|> (do 
-                    reservedOp "-" -- Int INVERSION
-                    UnOp Inv <$> unaryExpr)
+unaryExpr = (UnOp Not <$> (reservedOp "~:(" *> unaryExpr)) -- NOT
+            <|> (UnOp Inv <$> (reservedOp "-" *> unaryExpr))-- Int INVERSION
             <|> primaryExpr
 
 -- Parser for multiplicative expressions
 multExpr :: Parser Expr
-multExpr = chainl1 unaryExpr (reservedOp "*" >> return (BinOp Mul))
+multExpr = chainl1 unaryExpr (BinOp Mul <$ reservedOp "*")
 
 -- Parser for additive expressions
 addExpr :: Parser Expr
-addExpr = chainl1 multExpr (do 
-    op <- (reservedOp "+" >> return Add) <|> (reservedOp "-" >> return Sub) 
-    return (BinOp op)
-    )
+addExpr = chainl1 multExpr $ (BinOp Add <$ reservedOp "+") <|> (BinOp Sub <$ reservedOp "-")
 
 -- Parser for relational expressions
 relExpr :: Parser Expr
 relExpr = do
   e1 <- addExpr
-  (do op <- (reservedOp "<" >> return Lt) <|>
-              (reservedOp "<=" >> return Leq) <|>
-              (reservedOp ">" >> return Gt) <|>
-              (reservedOp ">=" >> return Geq)
+  (do
+      op <- (Lt  <$ reservedOp "<")
+          <|> (Leq <$ reservedOp "<=")
+          <|> (Gt  <$ reservedOp ">")
+          <|> (Geq <$ reservedOp ">=")
       BinOp op e1 <$> addExpr
-   ) 
-   <|> return e1
+   ) <|> return e1
+
+
 
 -- Parser for equality expressions
 equalityExpr :: Parser Expr
 equalityExpr = do
   e1 <- relExpr
-  (do op <- (reservedOp "==" >> return Eq) <|> (reservedOp "!=" >> return Neq)
+  (do op <- ( Eq <$ reservedOp "==") <|> ( Neq <$ reservedOp "!=")
       BinOp op e1 <$> relExpr
    ) <|> return e1
 
 -- Parser for AND expressions
 andExpr :: Parser Expr
-andExpr = chainl1 equalityExpr (reservedOp "Y" >> return (BinOp And))
+andExpr = chainl1 equalityExpr (BinOp And <$ reservedOp "Y")
 
 -- Parser for OR expressions
 orExpr :: Parser Expr
-orExpr = chainl1 andExpr (reservedOp "O" >> return (BinOp Or))
+orExpr = chainl1 andExpr (BinOp Or <$ reservedOp "O")
 
 expr :: Parser Expr
 expr = orExpr
 
 -- Helper parsers for scopes
 beginScope :: Parser ()
-beginScope = (reserved "iniciamos" >> return ()) <|> (symbol "{" >> return ())
+beginScope = reserved "iniciamos" <|> () <$ symbol "{"
 
 endScope :: Parser ()
-endScope = (reserved "cerramos" >> return ()) <|> (symbol "}" >> return ())
+endScope = reserved "cerramos" <|> () <$ symbol "}"
 
 scopeBlock' :: Parser [Stmt]
 scopeBlock' = do
@@ -300,7 +291,7 @@ program = many statement <* eof
 
 -- Helper function to parse a program
 parseProgram :: String -> Either ParseError [Stmt]
-parseProgram input = parse program "" input
+parseProgram = parse program ""
 
 -- Example usage
 main :: IO ()
