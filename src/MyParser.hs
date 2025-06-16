@@ -291,7 +291,7 @@ program = many statement <* eof
 
 -- Helper function to parse a program
 parseMyLang :: String -> Either ParseError [Stmt]
-parseProgram = parse program ""
+parseMyLang = parse program ""
 
 
 
