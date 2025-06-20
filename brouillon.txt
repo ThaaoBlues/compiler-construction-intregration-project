@@ -1,0 +1,6 @@
+stmts = [(Declaration Entero "x"),(Assignment "x" (IntLit 5))]
+stackChecking stmts [fillSymbolTable stmts]
+
+stmts = [Declaration Entero "x",Assignment "x" (BoolLit True)]
+inferType (BoolLit True) [fillSymbolTable stmts]
+lookupStack [fillSymbolTable stmts] "x"

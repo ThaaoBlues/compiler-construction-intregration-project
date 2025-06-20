@@ -1,5 +1,5 @@
 module MyParser
-    ( parseMyLang
+    ( parseMyLang, stackChecking,fillSymbolTable, Type(..), Stmt(..), Expr(..),Op(..)
     ) where
 
 import Text.Parsec
@@ -53,7 +53,7 @@ commaSep :: Parser a -> Parser [a]
 commaSep = Tok.commaSep lexer
 
 -- AST definition
-data Type = Entero | Booleana | Array
+data Type = Entero | Booleana | Array | Lock | CompilationError String
           deriving (Show, Eq)
 
 data Op = Mul 
@@ -78,7 +78,7 @@ data Expr = IntLit Integer
           | BinOp Op Expr Expr
           | UnOp Op Expr
           | Paren Expr
-          deriving (Show)
+          deriving (Show,Eq)
 
 data Stmt = Declaration Type String
           | Assignment String Expr
@@ -93,7 +93,7 @@ data Stmt = Declaration Type String
           | LockFree String
           | LockGet String
           | ScopeBlock [Stmt]
-          deriving (Show)
+          deriving (Show,Eq)
 
 -- Parser for type identifiers
 typeIdentifier :: Parser Type
@@ -217,7 +217,8 @@ printStatement = do
   reserved "imprimir"
   symbol "¡"
   exprVal <- expr
-  symbol "!:)"
+  symbol "!"
+  symbol ":)"
   return $ Print exprVal
 
 threadCreate :: Parser Stmt
@@ -316,6 +317,7 @@ type STStack = [SymbolTable] -- to support scopes
 stackChecking:: [Stmt]->STStack->Bool
 -- (:) operator appends at front of the array, 
 -- exatcly what we want as we are going recursively deeper
+stackChecking [] _ = True
 stackChecking s@(x:xs) stack =
   -- create contextual stack
   let st = fillSymbolTable s:stack 
@@ -331,21 +333,33 @@ stackChecking s@(x:xs) stack =
     (Assignment id e) -> inferType e st == 
       -- handling variable out of scope error
       case lookupStack st id of
-        (Left s) -> error s
+        (Left s) -> CompilationError s
         (Right t) -> t
+
+    -- check if locks objects exists
+    (LockGet id) -> case lookupStack st id of
+      (Left s) -> False
+      (Right t) -> True
+    
+    (LockFree id) -> case lookupStack st id of
+      (Left s) -> False
+      (Right t) -> True
 
     -- go recursively deeper in the nested scope
     (ThreadCreate body) -> stackChecking body st
     (ScopeBlock body) -> stackChecking body st
   
+    _ -> True -- other statements that we do not need to check
     -- print takes also an expression but we print every types
 
+    && stackChecking xs stack
 
 -- actually takes care of filling a symbol table on a specific depth
 fillSymbolTable::[Stmt]->SymbolTable
 fillSymbolTable [] = []
 fillSymbolTable ((Declaration t id):xs) = (id,t) : fillSymbolTable xs 
-
+fillSymbolTable ((LockCreate id):xs) = (id,Lock) : fillSymbolTable xs
+fillSymbolTable (_:xs) = fillSymbolTable xs
 
 
 -- data Expr = IntLit Integer
@@ -363,6 +377,7 @@ lookupStack (t:ts) id = case lookupTable t id of
                           (Right t) -> Right t
 
 lookupTable::SymbolTable->String->Either String Type
+lookupTable [] tid = Left "Variable out of scope"
 lookupTable [(id,vartype)] tid 
   | id == tid = Right vartype
   | otherwise = Left "Variable out of scope"
