@@ -8,6 +8,7 @@ import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Language (haskellStyle)
 import Text.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 import Text.Parsec.Combinator (chainl1)
+import Data.Type.Coercion (sym)
 
 -- Define the lexer
 lexer :: Tok.TokenParser ()
@@ -53,7 +54,7 @@ commaSep :: Parser a -> Parser [a]
 commaSep = Tok.commaSep lexer
 
 -- AST definition
-data Type = Entero | Booleana | Array | Lock | CompilationError String
+data Type = Entero | Booleana | Array Type| Lock | Global Type |CompilationError String
           deriving (Show, Eq)
 
 data Op = Mul 
@@ -71,7 +72,9 @@ data Op = Mul
     | Neq
         deriving (Show,Eq)
 
-data Expr = IntLit Integer
+data Expr = 
+            ArrayAccess String Expr
+          | IntLit Integer
           | BoolLit Bool
           | Var String
           | ArrayLit [Expr]
@@ -88,7 +91,6 @@ data Stmt = Declaration Type String
           | ThreadCreate [Stmt]
           | ThreadJoin
           | StartThread String
-          | GlobalDecl String
           | LockCreate String
           | LockFree String
           | LockGet String
@@ -97,9 +99,11 @@ data Stmt = Declaration Type String
 
 -- Parser for type identifiers
 typeIdentifier :: Parser Type
-typeIdentifier = (Entero <$ reserved "entero")
+typeIdentifier =
+              (Global <$ reserved "global") <*> typeIdentifier
+            <|> (Entero <$ reserved "entero")
             <|> (Booleana <$ reserved "booleana")
-            <|> (Array <$ reserved "array")
+            <|> ( (Array <$ reserved "array") <*> typeIdentifier) -- ex : array entero = [1,2,3]:)
 
 -- Parser for primary expressions
 primaryExpr :: Parser Expr
@@ -158,7 +162,7 @@ orExpr :: Parser Expr
 orExpr = chainl1 andExpr (BinOp Or <$ reservedOp "O")
 
 expr :: Parser Expr
-expr = orExpr
+expr = try accessArray <|> orExpr 
 
 -- Helper parsers for scopes
 beginScope :: Parser ()
@@ -241,12 +245,14 @@ startThread = do
   symbol ":)"
   return $ StartThread threadName
 
-globalDecl :: Parser Stmt
-globalDecl = do
-  reserved "global"
-  varName <- identifier
-  symbol ":)"
-  return $ GlobalDecl varName
+accessArray :: Parser Expr
+accessArray = do 
+  id <- identifier
+  symbol "["
+  index <- expr
+  symbol "]"
+
+  return $ ArrayAccess id index
 
 lockCreate :: Parser Stmt
 lockCreate = do
@@ -281,7 +287,6 @@ statement = try declaration
         <|> try threadCreate
         <|> try threadJoin
         <|> try startThread
-        <|> try globalDecl
         <|> try lockCreate
         <|> try lockFree
         <|> try lockGet
@@ -407,10 +412,10 @@ inferType:: Expr->STStack->Type
 inferType (IntLit _) st = Entero
 inferType (BoolLit _) st = Booleana
 inferType (ArrayLit xs) st 
-  | allTypesEq (map (flip inferType st) xs) = Array
+  | allTypesEq (map (flip inferType st) xs) = Array $ inferType (head xs) st
   | otherwise = CompilationError "Cannot create an array of non-homogeneous types"
 inferType (Var id) st = case lookupStack st id of
-  (Left s) -> error s
+  (Left s) -> CompilationError s
   (Right t) -> t
 -- allows only integer multiplication
 inferType (BinOp (Mul) e1 e2) st
@@ -472,6 +477,18 @@ inferType (BinOp (_) e1 e2) st
   | otherwise = CompilationError "Cannot compare two types other than Entero"
   where t1 = inferType e1 st
         t2 = inferType e2 st
+
+inferType (ArrayAccess id e) st | (t1 == Entero) && 
+      case lookupStack st id of
+        (Left _) -> False
+        (Right _) -> True
+      
+      = case lookupStack st id of
+          (Left s) -> CompilationError s
+          (Right a) -> a
+      | otherwise = CompilationError ("Invalid access to array "++id)
+
+      where t1 = inferType e st
 
 -- parenthesised expression
 inferType (Paren e) st = inferType e st

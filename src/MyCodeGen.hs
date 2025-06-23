@@ -1,25 +1,223 @@
 module MyCodeGen
     ( codeGen ) where
 
-import Sprockell
+import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr)
+import MyParser (Stmt(..), Expr(..), Op(..), Type(..))
 
-codeGen :: Integer -> [Instruction]
-codeGen n = [ 
-         Load (ImmValue $ fromInteger n) regE  -- upper bound is hardcoded
-       , Load (ImmValue 0) regA                -- first number
-       , Load (ImmValue 1) regB                -- second number
+-- Global symbol table type
+type GlobalSymbolTable = [(String, MemAddr)]
 
-       -- "beginloop"
-       , Compute Gt regA regE regC             -- regA > regE ?
-       , Branch regC (Abs 12)                  -- then jump to target "end"
-       , WriteInstr regA numberIO              -- output regA
-       , Compute Add regA regB regA
-       , Compute Gt regB regE regC             -- regB > regE
-       , Branch regC (Abs 12)                  -- target "end"
-       , WriteInstr regB numberIO              -- output regB
-       , Compute Add regA regB regB
-       , Jump (Rel (-8))                       -- target "beginloop"
+-- Initial global symbol table
+globalSymbolTable :: GlobalSymbolTable
+globalSymbolTable = []
 
-       -- "end"
-       , EndProg
-       ]
+-- Add a global variable to the symbol table
+addGlobalVariable :: String -> Type -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
+addGlobalVariable name typ table =
+  let addr = case table of
+              [] -> 0
+              _ -> maximum (map snd table) + 1
+      newTable = (name, addr) : table
+  in (newTable, addr)
+
+
+-- Get memory address for a variable
+getMemAddrForVar :: String -> GlobalSymbolTable -> MemAddr
+getMemAddrForVar varName table =
+  case lookup varName table of
+    Just addr -> addr
+    Nothing -> error ("Global variable not found: " ++ varName)
+
+-- Add a lock to the symbol table
+addLock :: String -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
+addLock name table =
+  let addr = case table of
+              [] -> 0
+              _ -> maximum (map snd table) + 1
+      newTable = (name, addr) : table
+  in (newTable, addr)
+
+
+-- Get memory address for a lock
+getMemAddrForLock :: String -> GlobalSymbolTable -> MemAddr
+getMemAddrForLock lockName table =
+  case lookup lockName table of
+    Just addr -> addr
+    Nothing -> error ("Lock not found: " ++ lockName)
+
+-- Allocate memory for an array
+allocateArrayMemory :: GlobalSymbolTable -> Int -> MemAddr
+allocateArrayMemory globalTable length =
+  let maxAddr = case globalTable of
+                 [] -> 0
+                 _ -> maximum (map snd globalTable) + 1 -- [(varname,memory_addr)]
+  in maxAddr
+
+-- Generate code for a list of statements
+generateCode :: GlobalSymbolTable -> [Stmt] -> [Instruction]
+generateCode globalTable stmts = concatMap (generateStmtCode globalTable) stmts
+
+-- Generate code for a statement
+generateStmtCode :: GlobalSymbolTable -> Stmt -> [Instruction]
+generateStmtCode globalTable (Declaration typ name) =
+  case typ of
+    (Global _) -> let (newGlobalTable, addr) = addGlobalVariable name typ globalTable
+                  in []
+    _ -> [] -- For local variables, we need to manage registers
+
+
+generateStmtCode globalTable (Assignment var expr) =
+  let exprCode = generateExprCode globalTable expr
+      varAddr = getMemAddrForVar var globalTable
+  in exprCode ++ [Store r1 (DirAddr varAddr)]
+
+
+generateStmtCode globalTable (If cond body) =
+  let condCode = generateExprCode globalTable cond
+      bodyCode = generateCode globalTable body
+      condReg = r1 -- Assume condition is in r1
+      -- we use NOP as a fallback for condition as we don't know anything about what's after
+  in condCode ++ [Branch condReg (Rel (length bodyCode + 1))] ++ bodyCode ++ [Nop] -- Placeholder for end of condition
+
+
+generateStmtCode globalTable (While cond body) =
+  let condCode = generateExprCode globalTable cond
+      bodyCode = generateCode globalTable body
+      condReg = r1 -- Assume condition is in r1
+      loopStart = length bodyCode + length condCode + 3
+      loopEnd = length bodyCode + length condCode + 2
+
+  -- same here as for condition, NOP as fallback after while
+  in [Jump (Rel loopStart)] ++ condCode ++ [Branch condReg (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] ++ bodyCode ++ [Jump (Rel (-loopStart))] ++ [Nop]
+
+
+generateStmtCode globalTable (Print expr) =
+  let exprCode = generateExprCode globalTable expr
+  in exprCode ++ [WriteInstr r1 (DirAddr outputAddress)]
+
+
+generateStmtCode globalTable (ThreadCreate body) =
+  let bodyCode = generateCode globalTable body
+  in bodyCode ++ [EndProg]
+
+
+-- IDEA : each thread sends a 1 value when exiting
+-- Thus we can copy the loop used in the demo to wait for end of thread
+generateStmtCode globalTable (ThreadJoin) = [] -- To implement: synchronization to wait for threads
+
+generateStmtCode globalTable (StartThread threadName) = [] -- To implement: start a specific thread
+
+generateStmtCode globalTable (LockCreate lockName) =
+  let (newGlobalTable, addr) = addLock lockName globalTable
+  in []
+
+
+generateStmtCode globalTable (LockFree lockName) =
+  let lockAddr = getMemAddrForLock lockName globalTable
+  in [WriteInstr (ImmValue 0) (DirAddr lockAddr)] -- Release lock by writing 0
+
+
+generateStmtCode globalTable (LockGet lockName) =
+  let lockAddr = getMemAddrForLock lockName globalTable
+  in [TestAndSet (DirAddr lockAddr), Receive r1] -- Acquire lock with test-and-set
+
+
+generateStmtCode globalTable (ScopeBlock body) = generateCode globalTable body
+
+-- Generate code for an expression
+generateExprCode :: GlobalSymbolTable -> Expr -> [Instruction]
+
+generateExprCode globalTable (IntLit n) = [Load (ImmValue (fromIntegral n)) r1] -- Assume we use r1 for the result
+
+generateExprCode globalTable (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1]
+
+generateExprCode globalTable (Var varName) =
+  let varAddr = getMemAddrForVar varName globalTable
+  in [Load (DirAddr varAddr) r1]
+
+
+generateExprCode globalTable (BinOp op e1 e2) =
+  let e1Code = generateExprCode globalTable e1
+      e2Code = generateExprCode globalTable e2
+      opCode = case op of
+                MyParser.Add -> Sprockell.Add
+                MyParser.Sub -> Sprockell.Sub
+                MyParser.Mul -> Sprockell.Mul
+                MyParser.Eq -> Sprockell.Equal
+                MyParser.Lt -> Sprockell.Lt
+                MyParser.Leq -> Sprockell.LtE
+                MyParser.Gt -> Sprockell.Gt
+                MyParser.Geq -> Sprockell.GtE
+                MyParser.Neq -> Sprockell.NEq
+                MyParser.And -> Sprockell.And
+                MyParser.Or -> Sprockell.Or
+                _ -> error "Unsupported operation"
+  in e1Code ++ [Store r1 (DirAddr tempAddr1)] ++ e2Code ++ [Load (DirAddr tempAddr1) r2, Compute opCode r1 r2 r3] -- Assume e1 is in r1, e2 in r2, result in r3
+
+
+generateExprCode globalTable (UnOp op e) =
+  let eCode = generateExprCode globalTable e
+      opCode = case op of
+                Not -> Not
+                Inv -> Inv
+  in eCode ++ [Compute opCode r1 r1 r1] -- Assume e is in r1, result in r1
+
+generateExprCode globalTable (Paren e) = generateExprCode globalTable e
+
+generateExprCode globalTable (ArrayLit exprs) =
+  let exprCodes = map (generateExprCode globalTable) exprs
+      arrayLength = length exprs
+      arrayAddr = allocateArrayMemory globalTable arrayLength
+  in concatMap (\ (idx, exprCode) -> exprCode ++ [Store r1 (DirAddr (arrayAddr + idx))]) (zip [0..] exprCodes)
+
+generateExprCode globalTable (ArrayAccess arrayName indexExpr) =
+  let indexCode = generateExprCode globalTable indexExpr
+      arrayAddr = getMemAddrForVar arrayName globalTable
+  in indexCode ++ [Load (DirAddr (arrayAddr + r1)) r1] -- Load array element at address arrayAddr + index
+
+-- Register and memory address management
+r1, r2, r3 :: RegAddr
+r1 = 0
+r2 = 1
+r3 = 2
+
+tempAddr1 :: MemAddr
+tempAddr1 = 0xFFFE -- Temporary address for storing intermediate values
+
+outputAddress :: MemAddr
+outputAddress = 0xFFFF -- Fixed address for output operations
+
+-- Generate a full program with multiple Sprockells
+generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
+generateFullProgram globalTable stmts =
+  let mainCode = generateCode globalTable stmts
+
+
+-- main :: IO ()
+-- main = do
+--   let programText = unlines [
+--         "global entero a:)",
+--         "esclusa lock1:)",
+--         "a = 5:)",
+--         "imprimir ¡a!:)",
+--         "hilo {",
+--         "  obtener lock1:)",
+--         "  a = a + 1:)",
+--         "  liberar lock1:)",
+--         "}",
+--         "esperamos:)"
+--        ]
+--   case parseMyLang programText of
+--     Left err -> print err
+--     Right program -> do
+--       let initialGlobalTable = []
+--           (globalTable, _) = foldl (\(table, _) stmt ->
+--                                     case stmt of
+--                                       Declaration (Global _) name -> addGlobalVariable name (Global Entero) table
+--                                       LockCreate name -> addLock name table
+--                                       _ -> (table, ()))
+--                                   (initialGlobalTable, ())
+--                                   program
+--           instructions = generateCode globalTable program
+--       putStrLn "Generated Sprockell Instructions:"
+--       mapM_ print instructions

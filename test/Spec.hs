@@ -23,6 +23,10 @@ parserSpec = describe "Parser" $ do
     it "parses a valid assignment" $ do
         let input = "x = 5 :)"
         parseMyLang input `shouldBe` Right [Assignment "x" (IntLit 5)]
+    
+    it "parses a valid array access" $ do
+        let input = "array entero a:) a = [1,2,3]:) entro x:) x = a[1]:)"
+        parseMyLang input `shouldBe` Right [Declaration (Array Entero) "a",Declaration Entero "x",Assignment "x" (ArrayAccess "a" (IntLit 1))]
 
     it "parses a valid if statement" $ do
         let input = "si verdad { imprimir ¡5! :) }"

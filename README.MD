@@ -22,11 +22,13 @@
 - scopes "iniciamos" "cerramos" or "{}" but it is boring
 - if "si"
 - assignments "variable_name = value:)"
+- array accesses "arr[entero]:)"
+- array declaration "array type name = [v1,v2,v3]:)"
 - while "durante"
 - expressions right after "durante" and "si" must be evaluated as boolean during type checking
 - print "imprimir¡value!:)"
 - create thread "hilo:)"
-- start thread "empezamos thread_name:)"
+- start thread (thread creation also automatically starts it)
 - join thread "esperamos:)"
 - global thread variable "global variable_name"
 - create lock "esclusa lock_name:)"
@@ -34,4 +36,12 @@
 - get lock "obtener lock_name:)"
 
 
-  
+
+
+## code generation
+- global variable storage
+- thread creation
+- thread end
+- locks (use atomic instruction)
+- assignments
+- 
