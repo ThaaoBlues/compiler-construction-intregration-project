@@ -21,12 +21,12 @@ addGlobalVariable name typ table =
   in (newTable, addr)
 
 
--- Get memory address for a variable
-getMemAddrForVar :: String -> GlobalSymbolTable -> MemAddr
-getMemAddrForVar varName table =
-  case lookup varName table of
+-- Get memory address for a given object
+getMemAddrFromTable :: String -> GlobalSymbolTable -> MemAddr
+getMemAddrFromTable name table =
+  case lookup name table of
     Just addr -> addr
-    Nothing -> error ("Global variable not found: " ++ varName)
+    Nothing -> error ("Global variable not found: " ++ name)
 
 -- Add a lock to the symbol table
 addLock :: String -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
@@ -37,13 +37,6 @@ addLock name table =
       newTable = (name, addr) : table
   in (newTable, addr)
 
-
--- Get memory address for a lock
-getMemAddrForLock :: String -> GlobalSymbolTable -> MemAddr
-getMemAddrForLock lockName table =
-  case lookup lockName table of
-    Just addr -> addr
-    Nothing -> error ("Lock not found: " ++ lockName)
 
 -- Allocate memory for an array
 allocateArrayMemory :: GlobalSymbolTable -> Int -> MemAddr
@@ -68,7 +61,7 @@ generateStmtCode globalTable (Declaration typ name) =
 
 generateStmtCode globalTable (Assignment var expr) =
   let exprCode = generateExprCode globalTable expr
-      varAddr = getMemAddrForVar var globalTable
+      varAddr = getMemAddrFromTable var globalTable
   in exprCode ++ [Store r1 (DirAddr varAddr)]
 
 
@@ -113,12 +106,12 @@ generateStmtCode globalTable (LockCreate lockName) =
 
 
 generateStmtCode globalTable (LockFree lockName) =
-  let lockAddr = getMemAddrForLock lockName globalTable
-  in [WriteInstr (ImmValue 0) (DirAddr lockAddr)] -- Release lock by writing 0
+  let lockAddr = getMemAddrFromTable lockName globalTable
+  in [WriteInstr 0 (DirAddr lockAddr)] -- Release lock by writing 0
 
 
 generateStmtCode globalTable (LockGet lockName) =
-  let lockAddr = getMemAddrForLock lockName globalTable
+  let lockAddr = getMemAddrFromTable lockName globalTable
   in [TestAndSet (DirAddr lockAddr), Receive r1] -- Acquire lock with test-and-set
 
 
@@ -129,10 +122,11 @@ generateExprCode :: GlobalSymbolTable -> Expr -> [Instruction]
 
 generateExprCode globalTable (IntLit n) = [Load (ImmValue (fromIntegral n)) r1] -- Assume we use r1 for the result
 
+-- store booleans as int in {0,1}
 generateExprCode globalTable (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1]
 
 generateExprCode globalTable (Var varName) =
-  let varAddr = getMemAddrForVar varName globalTable
+  let varAddr = getMemAddrFromTable varName globalTable
   in [Load (DirAddr varAddr) r1]
 
 
@@ -157,10 +151,12 @@ generateExprCode globalTable (BinOp op e1 e2) =
 
 generateExprCode globalTable (UnOp op e) =
   let eCode = generateExprCode globalTable e
-      opCode = case op of
-                Not -> Not
-                Inv -> Inv
-  in eCode ++ [Compute opCode r1 r1 r1] -- Assume e is in r1, result in r1
+      computeCode = case op of
+
+                -- Booleans are ints in {0,1} so we need to make ifs
+                MyParser.Not -> [Compute ] 
+                MyParser.Inv -> [Compute Sprockell.Sub 0 r1 r1]
+  in eCode ++ computeCode
 
 generateExprCode globalTable (Paren e) = generateExprCode globalTable e
 
@@ -168,12 +164,14 @@ generateExprCode globalTable (ArrayLit exprs) =
   let exprCodes = map (generateExprCode globalTable) exprs
       arrayLength = length exprs
       arrayAddr = allocateArrayMemory globalTable arrayLength
-  in concatMap (\ (idx, exprCode) -> exprCode ++ [Store r1 (DirAddr (arrayAddr + idx))]) (zip [0..] exprCodes)
+
+  -- index of expression is also offset in array/4, as we assume everything stored on 4 bytes ;)
+  in concatMap (\ (idx, exprCode) -> exprCode ++ [Store r1 (DirAddr (arrayAddr + idx*4))]) (zip [0..] exprCodes)
 
 generateExprCode globalTable (ArrayAccess arrayName indexExpr) =
   let indexCode = generateExprCode globalTable indexExpr
-      arrayAddr = getMemAddrForVar arrayName globalTable
-  in indexCode ++ [Load (DirAddr (arrayAddr + r1)) r1] -- Load array element at address arrayAddr + index
+      arrayAddr = getMemAddrFromTable arrayName globalTable
+  in indexCode ++ [Load (DirAddr (arrayAddr + r1*4)) r1] -- Load array element at address arrayAddr + index
 
 -- Register and memory address management
 r1, r2, r3 :: RegAddr
@@ -189,9 +187,7 @@ outputAddress = 0xFFFF -- Fixed address for output operations
 
 -- Generate a full program with multiple Sprockells
 generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
-generateFullProgram globalTable stmts =
-  let mainCode = generateCode globalTable stmts
-
+generateFullProgram = generateCode
 
 -- main :: IO ()
 -- main = do
@@ -221,3 +217,6 @@ generateFullProgram globalTable stmts =
 --           instructions = generateCode globalTable program
 --       putStrLn "Generated Sprockell Instructions:"
 --       mapM_ print instructions
+
+
+-- TODO : Booleans inversion, thread execution,thread join, local variables (register constraints), tests 
