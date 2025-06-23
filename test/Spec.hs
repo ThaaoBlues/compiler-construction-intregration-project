@@ -115,12 +115,12 @@ typeCheckerSpec = describe "Type Checker" $ do
             checkTypeInvalid stmts
 
         -- DO WE ACCEPT NON HOMOGENEOUS TYPES ?? I THINK SO BUT IT SEEMS WEIRD
-     --    it "rejects an invalid array" $ do
-     --        let stmts = [
-     --                Declaration Array "arr",
-     --                Assignment "arr" (ArrayLit [IntLit 1, BoolLit True, IntLit 3])  -- Non-homogeneous types
-     --                ]
-     --        checkTypeInvalid stmts
+        it "rejects an invalid array" $ do
+            let stmts = [
+                    Declaration Array "arr",
+                    Assignment "arr" (ArrayLit [IntLit 1, BoolLit True, IntLit 3])  -- Non-homogeneous types
+                    ]
+            checkTypeInvalid stmts
 
 
 

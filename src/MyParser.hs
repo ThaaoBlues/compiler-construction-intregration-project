@@ -408,68 +408,68 @@ inferType (IntLit _) st = Entero
 inferType (BoolLit _) st = Booleana
 inferType (ArrayLit xs) st 
   | allTypesEq (map (flip inferType st) xs) = Array
-  | otherwise = error "Cannot create an array of non-homogeneous types"
+  | otherwise = CompilationError "Cannot create an array of non-homogeneous types"
 inferType (Var id) st = case lookupStack st id of
   (Left s) -> error s
   (Right t) -> t
 -- allows only integer multiplication
 inferType (BinOp (Mul) e1 e2) st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = error "Cannot multiply two types other than Entero"
+  | otherwise = CompilationError "Cannot multiply two types other than Entero"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (BinOp (Add) e1 e2) st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = error "Cannot add two types other than Entero"
+  | otherwise = CompilationError "Cannot add two types other than Entero"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (BinOp (Sub) e1 e2) st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = error "Cannot subtract two types other than Entero"
+  | otherwise = CompilationError "Cannot subtract two types other than Entero"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (UnOp (Inv) e1) st
   | t1 == Entero = Entero
-  | otherwise = error "Cannot Invert types other than Entero"
+  | otherwise = CompilationError "Cannot Invert types other than Entero"
   where t1 = inferType e1 st
 
 inferType (UnOp (Not) e1) st
   | t1 == Booleana = Booleana
-  | otherwise = error "Cannot negate two types other than Booleana"
+  | otherwise = CompilationError "Cannot negate two types other than Booleana"
   where t1 = inferType e1 st
 
 
 inferType (BinOp (Or) e1 e2) st
   | t1 == Booleana && t2 == Booleana = Booleana
-  | otherwise = error "Cannot OR two types other than Booleana"
+  | otherwise = CompilationError "Cannot OR two types other than Booleana"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (BinOp (And) e1 e2) st
   | t1 == Booleana && t2 == Booleana = Booleana
-  | otherwise = error "Cannot AND two types other than Booleana"
+  | otherwise = CompilationError "Cannot AND two types other than Booleana"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (BinOp (Eq) e1 e2) st
   | t1 == t2 = Booleana
-  | otherwise = error "Cannot equate two differents types"
+  | otherwise = CompilationError "Cannot equate two differents types"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 inferType (BinOp (Neq) e1 e2) st
   | t1 == t2 = Booleana
-  | otherwise = error "Cannot equate two differents types"
+  | otherwise = CompilationError "Cannot equate two differents types"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
 -- the rest of operators are quantity comparators
 inferType (BinOp (_) e1 e2) st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = error "Cannot compare two types other than Entero"
+  | otherwise = CompilationError "Cannot compare two types other than Entero"
   where t1 = inferType e1 st
         t2 = inferType e2 st
 
