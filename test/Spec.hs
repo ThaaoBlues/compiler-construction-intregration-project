@@ -25,12 +25,12 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Assignment "x" (IntLit 5)]
     
     it "parses a valid array access" $ do
-        let input = "array entero a:) a = [1,2,3]:) entro x:) x = a[1]:)"
-        parseMyLang input `shouldBe` Right [Declaration (Array Entero) "a",Declaration Entero "x",Assignment "x" (ArrayAccess "a" (IntLit 1))]
+        let input = "array entero a:) a = [1,2,3]:) entero x:) x = a[1]:)"
+        parseMyLang input `shouldBe` Right [Declaration (Array Entero) "a",Assignment "a" (ArrayLit [IntLit 1,IntLit 2,IntLit 3]),Declaration Entero "x",Assignment "x" (ArrayAccess "a" (IntLit 1))]
 
     it "parses a valid if statement" $ do
-        let input = "si verdad { imprimir ¡5! :) }"
-        parseMyLang input `shouldBe` Right [If (BoolLit True) [Print (IntLit 5)]]
+        let input = "si verdad { imprimir ¡5! :) } sino { imprimir ¡10! :) }"
+        parseMyLang input `shouldBe` Right [If (BoolLit True) [Print (IntLit 5)] [Print (IntLit 10)]]
 
     it "rejects an invalid program" $ do
         let input = "x = 5"  -- Missing ":)"
@@ -49,13 +49,13 @@ typeCheckerSpec = describe "Type Checker" $ do
 
         it "accepts a valid condition" $ do
             let stmts = [
-                    If (BoolLit True) [Print (IntLit 5)]
+                    If (BoolLit True) [Print (IntLit 5)] [Print (IntLit 7)]
                     ]
             checkTypeValid stmts
 
         it "accepts a valid array" $ do
             let stmts = [
-                    Declaration Array "arr",
+                    Declaration (Array Entero) "arr",
                     Assignment "arr" (ArrayLit [IntLit 1, IntLit 2, IntLit 3])
                     ]
             checkTypeValid stmts
@@ -74,7 +74,7 @@ typeCheckerSpec = describe "Type Checker" $ do
 
         it "accepts a valid global declaration" $ do
             let stmts = [
-                    GlobalDecl "x"
+                    (Declaration (Global Entero) "x")
                     ]
             checkTypeValid stmts
 
@@ -108,7 +108,7 @@ typeCheckerSpec = describe "Type Checker" $ do
 
         it "rejects an invalid condition" $ do
             let stmts = [
-                    If (IntLit 5) [Print (IntLit 5)]  -- Non-boolean condition
+                    If (IntLit 5) [Print (IntLit 5)] [Print (IntLit 7)]  -- Non-boolean condition
                     ]
             checkTypeInvalid stmts
 
@@ -121,7 +121,7 @@ typeCheckerSpec = describe "Type Checker" $ do
         -- DO WE ACCEPT NON HOMOGENEOUS TYPES ?? I THINK SO BUT IT SEEMS WEIRD
         it "rejects an invalid array" $ do
             let stmts = [
-                    Declaration Array "arr",
+                    Declaration (Array Entero) "arr",
                     Assignment "arr" (ArrayLit [IntLit 1, BoolLit True, IntLit 3])  -- Non-homogeneous types
                     ]
             checkTypeInvalid stmts
@@ -143,7 +143,7 @@ typeCheckerSpec = describe "Type Checker" $ do
 
         it "rejects an invalid global declaration" $ do
             let stmts = [
-                    GlobalDecl "x",
+                    (Declaration (Global Entero) "x"),
                     Assignment "x" (BoolLit True)  -- Type error
                     ]
             checkTypeInvalid stmts

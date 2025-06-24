@@ -1,7 +1,7 @@
 module MyCodeGen
     ( codeGen ) where
 
-import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr)
+import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..))
 
 -- Global symbol table type
@@ -65,12 +65,17 @@ generateStmtCode globalTable (Assignment var expr) =
   in exprCode ++ [Store r1 (DirAddr varAddr)]
 
 
-generateStmtCode globalTable (If cond body) =
+generateStmtCode globalTable (If cond body1 body2) =
   let condCode = generateExprCode globalTable cond
-      bodyCode = generateCode globalTable body
+      ifBodyCode = generateCode globalTable body1
+      elseBodyCode = generateCode globalTable body1
       condReg = r1 -- Assume condition is in r1
       -- we use NOP as a fallback for condition as we don't know anything about what's after
-  in condCode ++ [Branch condReg (Rel (length bodyCode + 1))] ++ bodyCode ++ [Nop] -- Placeholder for end of condition
+  in condCode ++ [Branch condReg (Rel (length elseBodyCode + 2))] -- Jump to If 
+  ++ elseBodyCode
+  ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
+  ++ ifBodyCode 
+  ++ [Nop] -- Placeholder for end of condition
 
 
 generateStmtCode globalTable (While cond body) =
@@ -149,12 +154,27 @@ generateExprCode globalTable (BinOp op e1 e2) =
   in e1Code ++ [Store r1 (DirAddr tempAddr1)] ++ e2Code ++ [Load (DirAddr tempAddr1) r2, Compute opCode r1 r2 r3] -- Assume e1 is in r1, e2 in r2, result in r3
 
 
+
 generateExprCode globalTable (UnOp op e) =
   let eCode = generateExprCode globalTable e
       computeCode = case op of
 
                 -- Booleans are ints in {0,1} so we need to make ifs
-                MyParser.Not -> [Compute ] 
+                -- boolean negation
+
+                MyParser.Not -> do
+                                let ifBody = [Push reg0]
+                                let elseBody = [Load (ImmValue 1) r2, 
+                                        Push r2,
+                                        Jump (Rel (length ifBody+1))
+                                        ]
+                                [Branch r1 (Rel (length elseBody+2))]
+                                  ++ elseBody 
+                                  ++ ifBody
+                                  ++ [Nop]
+                                  ++ [Pop r1]
+
+                -- integer inversion
                 MyParser.Inv -> [Compute Sprockell.Sub 0 r1 r1]
   in eCode ++ computeCode
 
@@ -175,9 +195,9 @@ generateExprCode globalTable (ArrayAccess arrayName indexExpr) =
 
 -- Register and memory address management
 r1, r2, r3 :: RegAddr
-r1 = 0
-r2 = 1
-r3 = 2
+r1 = regA
+r2 = regB
+r3 = regC
 
 tempAddr1 :: MemAddr
 tempAddr1 = 0xFFFE -- Temporary address for storing intermediate values
@@ -186,8 +206,8 @@ outputAddress :: MemAddr
 outputAddress = 0xFFFF -- Fixed address for output operations
 
 -- Generate a full program with multiple Sprockells
-generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
-generateFullProgram = generateCode
+--generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
+--generateFullProgram = generateCode
 
 -- main :: IO ()
 -- main = do
@@ -218,5 +238,6 @@ generateFullProgram = generateCode
 --       putStrLn "Generated Sprockell Instructions:"
 --       mapM_ print instructions
 
+codeGen = 1
 
--- TODO : Booleans inversion, thread execution,thread join, local variables (register constraints), tests 
+-- TODO : thread execution,thread join, local variables (register constraints), tests 

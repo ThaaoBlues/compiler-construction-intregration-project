@@ -20,7 +20,7 @@
 - declaration (entero)(booleana)(array) "type variable_name:)"
 - default values entero:0,booleana:false,array:[]
 - scopes "iniciamos" "cerramos" or "{}" but it is boring
-- if "si"
+- if "si cond body \n sino body"
 - assignments "variable_name = value:)"
 - array accesses "arr[entero]:)"
 - array declaration "array type name = [v1,v2,v3]:)"

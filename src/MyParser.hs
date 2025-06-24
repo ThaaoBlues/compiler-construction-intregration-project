@@ -85,7 +85,7 @@ data Expr =
 
 data Stmt = Declaration Type String
           | Assignment String Expr
-          | If Expr [Stmt]
+          | If Expr [Stmt] [Stmt] -- The if contains the else body
           | While Expr [Stmt]
           | Print Expr
           | ThreadCreate [Stmt]
@@ -207,7 +207,7 @@ ifStatement = do
   reserved "si"
   cond <- expr
   -- symbol ":)"
-  If cond <$> scopeBlock'
+  If cond <$> scopeBlock' <*> option [] (reserved "sino" *> scopeBlock')
 
 whileStatement :: Parser Stmt
 whileStatement = do
@@ -236,14 +236,7 @@ threadJoin :: Parser Stmt
 threadJoin = do
   reserved "esperamos"
   symbol ":)"
-  return $ ThreadJoin
-
-startThread :: Parser Stmt
-startThread = do
-  reserved "empezamos"
-  threadName <- identifier
-  symbol ":)"
-  return $ StartThread threadName
+  return ThreadJoin
 
 accessArray :: Parser Expr
 accessArray = do 
@@ -286,7 +279,6 @@ statement = try declaration
         <|> try printStatement
         <|> try threadCreate
         <|> try threadJoin
-        <|> try startThread
         <|> try lockCreate
         <|> try lockFree
         <|> try lockGet
@@ -329,7 +321,7 @@ stackChecking s@(x:xs) stack =
   in case x of
 
     -- the condition in a if must be a boolean
-    (If e body) -> stackChecking body st && inferType e st == Booleana
+    (If e body1 body2) -> stackChecking body1 st && stackChecking body2 st && inferType e st == Booleana
 
     -- the condition in a while must be a boolean
     (While e body) -> stackChecking body st && inferType e st == Booleana
