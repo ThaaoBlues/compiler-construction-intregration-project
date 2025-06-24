@@ -1,11 +1,44 @@
 module MyCodeGen
     ( codeGen ) where
 
-import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC)
+import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..))
 
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
+
+-- threads table
+type GlobalThreadsTable = [(String,Int,Int)]
+
+addThread :: Int->GlobalThreadsTable -> GlobalThreadsTable
+addThread la tt= tt 
+  ++ [("thread_"++show tid++"_body",tid,la+1)]    
+  where tid = length tt +1
+
+generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
+generateThreadJumpCode [] = [
+        -- writeInstr WILL GO THERE
+
+         Jump (Rel 5)               -- Sprockell 0 jumps to skip thread repartition
+         -- beginLoop
+         , ReadInstr (IndAddr regSprID)
+         , Receive regA
+         , Compute Equal regA reg0 regB
+         , Branch regB (Rel (-3))
+
+        -- REST OF THE PROGRAM WILL GO THERE
+
+        -- endLoop
+        --  , WriteInstr regA numberIO
+        --  , Jump (Ind regA)
+
+        --  -- 12: Sprockell 0 is sent here
+        --  , EndProg
+
+        --  -- 13: Sprockells 1, 2 and 3 are sent here
+        --  , EndProg
+       ]
+generateThreadJumpCode (t:ts) = WriteInstr regC (DirAddr (length ts)):generateThreadJumpCode ts
 
 -- Initial global symbol table
 globalSymbolTable :: GlobalSymbolTable
@@ -46,31 +79,58 @@ allocateArrayMemory globalTable length =
                  _ -> maximum (map snd globalTable) + 1 -- [(varname,memory_addr)]
   in maxAddr
 
+
+
 -- Generate code for a list of statements
-generateCode :: GlobalSymbolTable -> [Stmt] -> [Instruction]
-generateCode globalTable stmts = concatMap (generateStmtCode globalTable) stmts
+-- the int is there to get the last address of the currently generated code
+generateCode :: GlobalSymbolTable->GlobalThreadsTable-> [Stmt]->Int -> [Instruction]
+
+-- No more statements, we can then generate the program header that manage jumps etc..
+
+generateCode gt tt [] la 
+  | null tt = []
+  | otherwise = do
+    let jumpCode = generateThreadJumpCode tt
+    -- Jump length tt+1 as it will corresspond to the first non-t0 exclusive part
+    -- (the Read-receive-jump part)
+    -- as there is as many WriteInstr lines as there are threads 
+    Branch regSprID (Rel (length tt +1)):jumpCode
+  
+
+-- Fills threads table to use it while building the jump section
+generateCode gt tt (s@(ThreadCreate body):xs) la = do
+  let ntt = addThread la tt
+  let code = generateStmtCode gt tt la s
+  code ++ generateCode gt ntt xs (la+length code)
+
+
+-- Default behavior
+generateCode gt tt (s:xs) la = 
+    code ++ generateCode gt tt xs (la+length code)
+    where code = generateStmtCode gt tt la s
+    
 
 -- Generate code for a statement
-generateStmtCode :: GlobalSymbolTable -> Stmt -> [Instruction]
-generateStmtCode globalTable (Declaration typ name) =
+generateStmtCode :: GlobalSymbolTable->GlobalThreadsTable->Int-> Stmt -> [Instruction]
+generateStmtCode globalTable _ _ (Declaration typ name) =
   case typ of
     (Global _) -> let (newGlobalTable, addr) = addGlobalVariable name typ globalTable
                   in []
     _ -> [] -- For local variables, we need to manage registers
 
 
-generateStmtCode globalTable (Assignment var expr) =
+generateStmtCode globalTable tt _ (Assignment var expr) =
   let exprCode = generateExprCode globalTable expr
       varAddr = getMemAddrFromTable var globalTable
   in exprCode ++ [Store r1 (DirAddr varAddr)]
 
 
-generateStmtCode globalTable (If cond body1 body2) =
+generateStmtCode globalTable tt la (If cond body1 body2) =
   let condCode = generateExprCode globalTable cond
-      ifBodyCode = generateCode globalTable body1
-      elseBodyCode = generateCode globalTable body1
+      elseBodyCode = generateCode globalTable tt body1 (la + length condCode + 1)
+      ifBodyCode = generateCode globalTable tt body1 (la+ length condCode+1+length elseBodyCode+1)
       condReg = r1 -- Assume condition is in r1
-      -- we use NOP as a fallback for condition as we don't know anything about what's after
+      -- We use NOP as a fallback for condition as we don't know anything about what's after
   in condCode ++ [Branch condReg (Rel (length elseBodyCode + 2))] -- Jump to If 
   ++ elseBodyCode
   ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
@@ -78,49 +138,57 @@ generateStmtCode globalTable (If cond body1 body2) =
   ++ [Nop] -- Placeholder for end of condition
 
 
-generateStmtCode globalTable (While cond body) =
-  let condCode = generateExprCode globalTable cond
-      bodyCode = generateCode globalTable body
-      condReg = r1 -- Assume condition is in r1
-      loopStart = length bodyCode + length condCode + 3
-      loopEnd = length bodyCode + length condCode + 2
+generateStmtCode globalTable tt la (While cond body) =
+  do 
+    let condCode = generateExprCode globalTable cond
+    let bodyCode = generateCode globalTable tt body (la+length condCode+3)  
+    let condReg = r1 -- Assume condition is in r1
+    let loopStart = length bodyCode + length condCode + 3
+    let loopEnd = length bodyCode + length condCode + 2
 
   -- same here as for condition, NOP as fallback after while
-  in [Jump (Rel loopStart)] ++ condCode ++ [Branch condReg (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] ++ bodyCode ++ [Jump (Rel (-loopStart))] ++ [Nop]
+    [Jump (Rel loopStart)] ++ condCode ++ [Branch condReg (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] ++ bodyCode ++ [Jump (Rel (-loopStart))] ++ [Nop]
 
 
-generateStmtCode globalTable (Print expr) =
+generateStmtCode globalTable tt _ (Print expr) =
   let exprCode = generateExprCode globalTable expr
   in exprCode ++ [WriteInstr r1 (DirAddr outputAddress)]
 
 
-generateStmtCode globalTable (ThreadCreate body) =
-  let bodyCode = generateCode globalTable body
-  in bodyCode ++ [EndProg]
+generateStmtCode gt tt la tc@(ThreadCreate body) =
+  do 
+    let bodyCode = generateCode gt tt body la
+    
+    bodyCode ++ [EndProg]
 
 
 -- IDEA : each thread sends a 1 value when exiting
 -- Thus we can copy the loop used in the demo to wait for end of thread
-generateStmtCode globalTable (ThreadJoin) = [] -- To implement: synchronization to wait for threads
+generateStmtCode globalTable tt _ (ThreadJoin) = [] -- To implement: synchronization to wait for threads
 
-generateStmtCode globalTable (StartThread threadName) = [] -- To implement: start a specific thread
+generateStmtCode globalTable tt _ (StartThread threadName) = [] -- To implement: start a specific thread
 
-generateStmtCode globalTable (LockCreate lockName) =
+generateStmtCode globalTable tt _ (LockCreate lockName) =
   let (newGlobalTable, addr) = addLock lockName globalTable
   in []
 
 
-generateStmtCode globalTable (LockFree lockName) =
+generateStmtCode globalTable tt _ (LockFree lockName) =
   let lockAddr = getMemAddrFromTable lockName globalTable
   in [WriteInstr 0 (DirAddr lockAddr)] -- Release lock by writing 0
 
 
-generateStmtCode globalTable (LockGet lockName) =
+generateStmtCode globalTable tt _ (LockGet lockName) =
   let lockAddr = getMemAddrFromTable lockName globalTable
   in [TestAndSet (DirAddr lockAddr), Receive r1] -- Acquire lock with test-and-set
 
 
-generateStmtCode globalTable (ScopeBlock body) = generateCode globalTable body
+generateStmtCode globalTable tt la (ScopeBlock body) = generateCode globalTable tt body la
+
+
+
+
+
 
 -- Generate code for an expression
 generateExprCode :: GlobalSymbolTable -> Expr -> [Instruction]
@@ -139,18 +207,18 @@ generateExprCode globalTable (BinOp op e1 e2) =
   let e1Code = generateExprCode globalTable e1
       e2Code = generateExprCode globalTable e2
       opCode = case op of
-                MyParser.Add -> Sprockell.Add
-                MyParser.Sub -> Sprockell.Sub
-                MyParser.Mul -> Sprockell.Mul
-                MyParser.Eq -> Sprockell.Equal
-                MyParser.Lt -> Sprockell.Lt
-                MyParser.Leq -> Sprockell.LtE
-                MyParser.Gt -> Sprockell.Gt
-                MyParser.Geq -> Sprockell.GtE
-                MyParser.Neq -> Sprockell.NEq
-                MyParser.And -> Sprockell.And
-                MyParser.Or -> Sprockell.Or
-                _ -> error "Unsupported operation"
+        MyParser.Add -> Sprockell.Add
+        MyParser.Sub -> Sprockell.Sub
+        MyParser.Mul -> Sprockell.Mul
+        MyParser.Eq -> Sprockell.Equal
+        MyParser.Lt -> Sprockell.Lt
+        MyParser.Leq -> Sprockell.LtE
+        MyParser.Gt -> Sprockell.Gt
+        MyParser.Geq -> Sprockell.GtE
+        MyParser.Neq -> Sprockell.NEq
+        MyParser.And -> Sprockell.And
+        MyParser.Or -> Sprockell.Or
+        _ -> error "Unsupported operation"
   in e1Code ++ [Store r1 (DirAddr tempAddr1)] ++ e2Code ++ [Load (DirAddr tempAddr1) r2, Compute opCode r1 r2 r3] -- Assume e1 is in r1, e2 in r2, result in r3
 
 
@@ -192,6 +260,9 @@ generateExprCode globalTable (ArrayAccess arrayName indexExpr) =
   let indexCode = generateExprCode globalTable indexExpr
       arrayAddr = getMemAddrFromTable arrayName globalTable
   in indexCode ++ [Load (DirAddr (arrayAddr + r1*4)) r1] -- Load array element at address arrayAddr + index
+
+
+
 
 -- Register and memory address management
 r1, r2, r3 :: RegAddr
@@ -241,3 +312,20 @@ outputAddress = 0xFFFF -- Fixed address for output operations
 codeGen = 1
 
 -- TODO : thread execution,thread join, local variables (register constraints), tests 
+-- threads handling :
+-- don't forget EndProg at each thread end
+
+
+--  Branch regSprID (Rel 6) 
+-- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
+-- WrintrInstr registerNumLine (DirAddr AddrDeductibleFromThreadNumber)
+-- the write Instr will put a value in shared memory ( the line where to jump)
+-- then, for all threads except thread 0 (=> t0 jumps over that part),
+-- we send a request to read that value with ReadInstr (Inaddr ..) 
+-- then we wait the answer with Recieve regX
+-- finally, we jump to the address in regX :)
+ 
+
+-- TODO : find a way to put this chunk at top of program after
+-- transform generateCode into a helper function and put last Instruction on top in the main func ?
+-- also we need to add the "final" EndProg
