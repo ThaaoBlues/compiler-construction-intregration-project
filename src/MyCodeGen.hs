@@ -197,9 +197,8 @@ generateStmtCode gt tt la (If cond body1 body2) =
     let condCode = generateExprCode gt cond
     let elseBodyCode = generateThreadBodyWithNested gt body2 tt
     let ifBodyCode = generateThreadBodyWithNested gt body1 tt
-    let condReg = r1 -- Assume condition is in r1
         -- We use NOP as a fallback for condition as we don't know anything about what's after
-    condCode ++ [Branch condReg (Rel (length elseBodyCode + 2))] -- Jump to If 
+    condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
       ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
       ++ ifBodyCode 
@@ -210,12 +209,16 @@ generateStmtCode gt tt la (While cond body) =
   do 
     let condCode = generateExprCode gt cond
     let bodyCode = generateThreadBodyWithNested gt body tt
-    let condReg = r1 -- Assume condition is in r1
     let loopStart = length bodyCode + length condCode + 3
     let loopEnd = length bodyCode + length condCode + 2
 
   -- same here as for condition, NOP as fallback after while
-    [Jump (Rel loopStart)] ++ condCode ++ [Branch condReg (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] ++ bodyCode ++ [Jump (Rel (-loopStart))] ++ [Nop]
+    [Jump (Rel loopStart)] 
+      ++ condCode 
+      ++ [Pop r1]
+      ++ [Branch r1 (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] 
+      ++ bodyCode ++ [Jump (Rel (-loopStart))] 
+      ++ [Nop]
 
 
 

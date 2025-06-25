@@ -183,6 +183,15 @@ codeGenSpec = describe "Code generation" $ do
             let st = fillSymbolTable ast
             codeGen ast `shouldBe` [Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537)]
 
+    describe "basic if/else program" $ do 
+        it "accept if/else program" $ do 
+            let prog = "si verdad { imprimir ¡5! :) } sino { imprimir ¡10! :) }"
+            let ast = case parseMyLang prog of
+                    (Left _) -> error "Parse error"
+                    (Right tree) -> tree  
+
+            let st = fillSymbolTable ast
+            codeGen ast `shouldBe` []
 
 
 main :: IO ()
