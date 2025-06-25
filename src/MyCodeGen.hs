@@ -88,7 +88,7 @@ collectAndGenerateThreads gt (ThreadCreate body : rest) la threadCounter =
     let threadName = "thread_" ++ show threadId ++ "_body"
         
     -- RECURSIVELY collect nested threads from the thread body
-    let (nestedThreads, nestedBody, _) = collectAndGenerateThreads gt body la threadId
+    let (nestedThreads, nestedBody, _) = collectAndGenerateThreads gt body (la+1) threadId
         
         -- Generate the actual thread body code (including nested threads)
     let threadBodyCode = generateThreadBodyWithNested gt body nestedThreads
@@ -139,14 +139,14 @@ generateThreadBodyWithNested gt body nestedThreads =
 -- Like generateThreadBodyWithNested but for normal bodies e.g if body
 -- still supports nested threads
 generateNormalBodyWithNested :: GlobalSymbolTable -> [Stmt] -> GlobalThreadsTable -> [Instruction]
-generateNormalBodyWithNested gt body nestedThreads = 
-    let -- Generate the body's own code
-        ownCode = concatMap (generateStmtCodeForThread gt nestedThreads 0) body
+generateNormalBodyWithNested gt body nestedThreads = do
+    -- Generate the body's own code
+    let ownCode = concatMap (generateStmtCodeForThread gt nestedThreads 0) body
         -- Add nested thread bodies at the end
-        nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
+    let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
                                    generateThreadBodyWithNested gt nestedBody []) nestedThreads
     
-    in ownCode ++ nestedBodies
+    ownCode ++ nestedBodies
 
 
 
@@ -433,7 +433,8 @@ codeGen ss = do
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
 -- TODO : thread execution,thread join, local variables (register constraints), tests 
--- check if relative jumps in conditions are of a good value
+-- CHECK WHY threads in threads are are off-by-1 in starting address (except the dad one)
+
 
 
 --  Branch regSprID (Rel 6) 

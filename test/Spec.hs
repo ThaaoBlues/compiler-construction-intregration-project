@@ -221,7 +221,7 @@ codeGenSpec = describe "Code generation" $ do
                 (Right tree) -> tree
 
         let st = fillSymbolTable ast
-        codeGen ast `shouldBe` [Branch 1 (Rel 6),Load (ImmValue 14) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 15) 4,WriteInstr 4 (DirAddr 2),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 3,EndProg,Load (ImmValue 0) 3,EndProg,Load (ImmValue 0) 3,EndProg]
+        codeGen ast `shouldBe` [Branch 1 (Rel 6),Load (ImmValue 14) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 16) 4,WriteInstr 4 (DirAddr 2),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 3,EndProg,Load (ImmValue 0) 3,EndProg,Load (ImmValue 0) 3,EndProg]
 
 
 main :: IO ()
