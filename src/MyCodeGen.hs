@@ -209,8 +209,8 @@ generateStmtCode gt tt la (While cond body) =
   do 
     let condCode = generateExprCode gt cond
     let bodyCode = generateThreadBodyWithNested gt body tt
-    let loopStart = length bodyCode + length condCode + 3
-    let loopEnd = length bodyCode + length condCode + 2
+    let loopStart = length bodyCode + length condCode + 4
+    let loopEnd = length bodyCode + length condCode + 3
 
   -- same here as for condition, NOP as fallback after while
     [Jump (Rel loopStart)] 
@@ -412,9 +412,7 @@ codeGen ss = body
   where (tt,body,la) = firstPassGeneration [] ss
 
 -- TODO : thread execution,thread join, local variables (register constraints), tests 
--- INTEGRATE OUR TWO PASS SOLUTION AND PLUG IT WITH HEADER GENERATION
--- threads handling :
--- don't forget EndProg at each thread end
+-- check if relative jumps in conditions are of a good value
 
 
 --  Branch regSprID (Rel 6) 
