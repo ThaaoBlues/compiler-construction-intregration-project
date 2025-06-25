@@ -2,7 +2,7 @@ module MyCodeGen
     ( codeGen ) where
 
 import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID)
-import MyParser (Stmt(..), Expr(..), Op(..), Type(..))
+import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
@@ -39,6 +39,8 @@ generateThreadJumpCode [] = [
         --  , EndProg
        ]
 generateThreadJumpCode (t:ts) = WriteInstr regC (DirAddr (length ts)):generateThreadJumpCode ts
+
+
 
 -- Initial global symbol table
 globalSymbolTable :: GlobalSymbolTable
@@ -81,9 +83,18 @@ allocateArrayMemory globalTable length =
 
 
 
+-- Wrapper function to put threads
+codeGen :: [Stmt]->[Instruction]
+
+codeGen ss = do
+    (body,header) <- generateCode [] []  ss 0
+    header ++ body
+
+
+
 -- Generate code for a list of statements
 -- the int is there to get the last address of the currently generated code
-generateCode :: GlobalSymbolTable->GlobalThreadsTable-> [Stmt]->Int -> [Instruction]
+generateCode :: GlobalSymbolTable->GlobalThreadsTable-> [Stmt]->Int -> ([Instruction],[Instruction])
 
 -- No more statements, we can then generate the program header that manage jumps etc..
 
@@ -101,7 +112,10 @@ generateCode gt tt [] la
 generateCode gt tt (s@(ThreadCreate body):xs) la = do
   let ntt = addThread la tt
   let code = generateStmtCode gt tt la s
-  code ++ generateCode gt ntt xs (la+length code)
+  code ++ do 
+    
+    (body,header) <- generateCode gt ntt xs (la+length code)
+    header ++ body
 
 
 -- Default behavior
