@@ -185,7 +185,7 @@ generateThreadJumpCode [] = [
        ]
 
 -- (name, threadId, startAddress, body)
-generateThreadJumpCode ((name,id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr (length ts))]
+generateThreadJumpCode ((name,id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr id)]
   ++ generateThreadJumpCode ts
 
 
