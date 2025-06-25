@@ -72,7 +72,7 @@ firstPassGeneration gt stmts =
         -- to discover their sizes, 
         -- as precedent thread size obviously influence following thread start address
     let adjustedThreads = map (\(name, tid, addr, body) -> (name, tid, addr + headerSize, body)) threads
-    (adjustedThreads, mainBody, headerSize)
+    (adjustedThreads, mainBody++[EndProg], headerSize)
 
 -- Collect threads and generate their bodies in first pass (with thread counter)
 collectAndGenerateThreads :: GlobalSymbolTable -> [Stmt] -> Int -> Int -> (GlobalThreadsTable, [Instruction], Int)
@@ -335,7 +335,7 @@ generateExprCode gt (UnOp op e) =
                             ++ ifBody
                             ++ [Nop]
                           -- at this point, result will be on top of stack
-                          
+
           -- integer inversion
           MyParser.Inv -> [Compute Sprockell.Sub 0 r1 r1]
 
