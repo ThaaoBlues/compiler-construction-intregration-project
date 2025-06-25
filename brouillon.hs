@@ -13,7 +13,8 @@ type GlobalThreadsTable = [ThreadInfo]
 
 -- Two-Pass Generation :
 -- First pass generates everything to get exact thread body sizes, 
--- Second pass uses real addresses
+-- Second pass uses real addresses to generate header
+
 
 -- First pass: generate all code to determine exact sizes with proper nested thread handling
 firstPassGeneration :: GlobalSymbolTable -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)

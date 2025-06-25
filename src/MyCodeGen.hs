@@ -7,8 +7,10 @@ import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
 
+-- Thread info: (name, threadId, startAddress, body)
+type ThreadInfo = (String, Int, Int, [Stmt])
 -- threads table
-type GlobalThreadsTable = [(String,Int,Int)]
+type GlobalThreadsTable = [ThreadInfo]
 
 addThread :: Int->GlobalThreadsTable -> GlobalThreadsTable
 addThread la tt= tt 
@@ -323,9 +325,9 @@ outputAddress = 0xFFFF -- Fixed address for output operations
 --       putStrLn "Generated Sprockell Instructions:"
 --       mapM_ print instructions
 
-codeGen = 1
 
 -- TODO : thread execution,thread join, local variables (register constraints), tests 
+-- INTEGRATE OUR TWO PASS SOLUTION AND PLUG IT WITH HEADER GENERATION
 -- threads handling :
 -- don't forget EndProg at each thread end
 
@@ -339,7 +341,3 @@ codeGen = 1
 -- then we wait the answer with Recieve regX
 -- finally, we jump to the address in regX :)
  
-
--- TODO : find a way to put this chunk at top of program after
--- transform generateCode into a helper function and put last Instruction on top in the main func ?
--- also we need to add the "final" EndProg
