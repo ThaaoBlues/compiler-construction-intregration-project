@@ -2,6 +2,8 @@ import MyParser
 import Test.Hspec
 import Test.QuickCheck
 import Data.Either
+import MyCodeGen (codeGen)
+import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO)
 -- Helper functions for type checker tests
 checkTypeValid :: [Stmt] -> Expectation
 checkTypeValid stmts = stackChecking stmts [fillSymbolTable stmts] `shouldBe` True
@@ -165,22 +167,26 @@ typeCheckerSpec = describe "Type Checker" $ do
             let stmts = [
                     LockGet "lock"  -- Undeclared lock
                     ]
+            
             checkTypeInvalid stmts
+
+
+codeGenSpec :: Spec
+codeGenSpec = describe "Code generation" $ do
+    describe "basic print program" $ do 
+        it "accept basic print program" $ do 
+            let prog = "imprimir¡5!:)"
+            let ast = case parseMyLang prog of
+                    (Left _) -> error "Parse error"
+                    (Right tree) -> tree  
+
+            let st = fillSymbolTable ast
+            codeGen ast `shouldBe` [Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537)]
+
+
 
 main :: IO ()
 main = hspec $ do
-    parserSpec
-    typeCheckerSpec
-
--- main :: IO ()
--- main = hspec $ do
---   describe "Parsing" $ do
---     it "should parse numbers" $ do
---         property $ \n -> (parseMyLang $ show (getPositive n)) `shouldBe` (Right (getPositive n) :: Either String Integer)
--- main =
-    -- --parseMyLang txt
---     case parseMyLang txt of
---          (Left err ) -> print err
---          (Right p) -> print p
-
---     where txt = "array x:) x = [1,2,3]:) durante x <= 5 { imprimir¡x!:) x = x*1*2 :)}"
+    -- parserSpec
+    -- typeCheckerSpec
+    codeGenSpec
