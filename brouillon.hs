@@ -11,8 +11,9 @@ type GlobalSymbolTable = [(String, MemAddr)]
 type ThreadInfo = (String, Int, Int, [Stmt])
 type GlobalThreadsTable = [ThreadInfo]
 
--- APPROACH 1: Two-Pass Generation (Recommended)
--- First pass generates everything to get exact sizes, second pass uses real addresses
+-- Two-Pass Generation :
+-- First pass generates everything to get exact thread body sizes, 
+-- Second pass uses real addresses
 
 -- First pass: generate all code to determine exact sizes with proper nested thread handling
 firstPassGeneration :: GlobalSymbolTable -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)
