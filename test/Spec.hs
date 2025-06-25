@@ -173,25 +173,34 @@ typeCheckerSpec = describe "Type Checker" $ do
 
 codeGenSpec :: Spec
 codeGenSpec = describe "Code generation" $ do
-    describe "basic print program" $ do 
-        it "accept basic print program" $ do 
-            let prog = "imprimir¡5!:)"
-            let ast = case parseMyLang prog of
-                    (Left _) -> error "Parse error"
-                    (Right tree) -> tree  
+    it "basic print program" $ do 
+        let prog = "imprimir¡5!:)"
+        let ast = case parseMyLang prog of
+                (Left _) -> error "Parse error"
+                (Right tree) -> tree  
 
-            let st = fillSymbolTable ast
-            codeGen ast `shouldBe` [Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537)]
+        let st = fillSymbolTable ast
+        codeGen ast `shouldBe` [Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),EndProg]
 
-    describe "basic if/else program" $ do 
-        it "accept if/else program" $ do 
-            let prog = "si verdad { imprimir ¡5! :) } sino { imprimir ¡10! :) }"
-            let ast = case parseMyLang prog of
-                    (Left _) -> error "Parse error"
-                    (Right tree) -> tree  
+    it "basic if/else program" $ do 
+        let prog = "si verdad { imprimir ¡5! :) } sino { imprimir ¡10! :) }"
+        let ast = case parseMyLang prog of
+                (Left _) -> error "Parse error"
+                (Right tree) -> tree  
 
-            let st = fillSymbolTable ast
-            codeGen ast `shouldBe` []
+        let st = fillSymbolTable ast
+        codeGen ast `shouldBe` [Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
+
+    
+    it "basic thread creation" $ do 
+        let prog = "entero x:) hilo { entero x:)}"
+        
+        let ast = case parseMyLang prog of
+                (Left e) -> error (show e)
+                (Right tree) -> tree
+
+        let st = fillSymbolTable ast
+        codeGen ast `shouldBe` []
 
 
 main :: IO ()

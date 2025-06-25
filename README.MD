@@ -27,7 +27,7 @@
 - while "durante"
 - expressions right after "durante" and "si" must be evaluated as boolean during type checking
 - print "imprimir¡value!:)"
-- create thread "hilo:)"
+- create thread "hilo { }:)"
 - start thread (thread creation also automatically starts it)
 - join thread "esperamos:)"
 - global thread variable "global variable_name"

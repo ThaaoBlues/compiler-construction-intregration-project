@@ -228,9 +228,8 @@ printStatement = do
 threadCreate :: Parser Stmt
 threadCreate = do
   reserved "hilo"
-  blockContent <- scopeBlock'
-  symbol ":)"
-  return $ ThreadCreate blockContent
+  -- symbol ":)"
+  ThreadCreate <$> scopeBlock'
 
 threadJoin :: Parser Stmt
 threadJoin = do
