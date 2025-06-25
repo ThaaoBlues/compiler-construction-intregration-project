@@ -131,6 +131,22 @@ generateThreadBodyWithNested gt body nestedThreads =
     -- TODO : ADD JOIN FLAG ?
     in ownCode ++ nestedBodies ++ [EndProg]
 
+-- Like generateThreadBodyWithNested but for normal bodies e.g if body
+-- still supports nested threads
+generateNormalBodyWithNested :: GlobalSymbolTable -> [Stmt] -> GlobalThreadsTable -> [Instruction]
+generateNormalBodyWithNested gt body nestedThreads = 
+    let -- Generate the body's own code
+        ownCode = concatMap (generateStmtCodeForThread gt nestedThreads 0) body
+        -- Add nested thread bodies at the end
+        nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
+                                   generateThreadBodyWithNested gt nestedBody []) nestedThreads
+    
+    -- Concat everything and don't forget the EndProg
+    -- TODO : ADD JOIN FLAG ?
+    in ownCode ++ nestedBodies
+
+
+
 -- Generate statement code within a thread context (handles nested ThreadCreate)
 generateStmtCodeForThread :: GlobalSymbolTable -> GlobalThreadsTable -> Int -> Stmt -> [Instruction]
 generateStmtCodeForThread gt nestedThreads la (ThreadCreate body) = 
@@ -195,10 +211,10 @@ generateStmtCode gt tt _ (Assignment var expr) =
 generateStmtCode gt tt la (If cond body1 body2) =
   do
     let condCode = generateExprCode gt cond
-    let elseBodyCode = generateThreadBodyWithNested gt body2 tt
-    let ifBodyCode = generateThreadBodyWithNested gt body1 tt
+    let elseBodyCode = generateNormalBodyWithNested gt body2 tt
+    let ifBodyCode = generateNormalBodyWithNested gt body1 tt
         -- We use NOP as a fallback for condition as we don't know anything about what's after
-    condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
+    condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 1))] -- Jump to If 
       ++ elseBodyCode
       ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
       ++ ifBodyCode 
@@ -208,7 +224,7 @@ generateStmtCode gt tt la (If cond body1 body2) =
 generateStmtCode gt tt la (While cond body) =
   do 
     let condCode = generateExprCode gt cond
-    let bodyCode = generateThreadBodyWithNested gt body tt
+    let bodyCode = generateNormalBodyWithNested gt body tt
     let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
 
@@ -234,16 +250,7 @@ generateStmtCode globalTable tt _ (Print e) =
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
   in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 charIO]
 
-generateStmtCode gt tt la tc@(ThreadCreate body) =
-  do 
-    let bodyCode = generateThreadBodyWithNested gt body tt
-
-    bodyCode ++ [EndProg]
-
-
 generateStmtCode globalTable tt _ (ThreadJoin) = []
-
-generateStmtCode globalTable tt _ (StartThread threadName) = [] -- To implement: start a specific thread
 
 generateStmtCode globalTable tt _ (LockCreate lockName) =
   let (newGlobalTable, addr) = addLock lockName globalTable
@@ -260,7 +267,7 @@ generateStmtCode globalTable tt _ (LockGet lockName) =
   in [TestAndSet (DirAddr lockAddr), Receive r1] -- Acquire lock with test-and-set
 
 
-generateStmtCode gt tt la (ScopeBlock body) = generateThreadBodyWithNested gt body tt
+generateStmtCode gt tt la (ScopeBlock body) = generateNormalBodyWithNested gt body tt
 
 
 
@@ -323,12 +330,12 @@ generateExprCode gt (UnOp op e) =
                                   Jump (Rel (length ifBody+1))
                                   ]
                           -- assume boolean expr result is on top of stack
-                          [Pop r1,Branch r1 (Rel (length elseBody+2))]
+                          [Pop r1,Branch r1 (Rel (length elseBody+1))]
                             ++ elseBody 
                             ++ ifBody
                             ++ [Nop]
-                            ++ [Pop r1]
-
+                          -- at this point, result will be on top of stack
+                          
           -- integer inversion
           MyParser.Inv -> [Compute Sprockell.Sub 0 r1 r1]
 
