@@ -99,7 +99,8 @@ collectAndGenerateThreads gt (ThreadCreate body : rest) la threadCounter =
                          then threadId 
                          else maximum (map (\(_, tid, _, _) -> tid) nestedThreads)
         
-    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt rest (la + threadSize) maxNestedId
+    -- +1 for EndProg addition
+    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt rest (la + threadSize+1) maxNestedId
         
     -- Concat this thread, all its nested threads and all the ones in following statements
     -- la+1 for taking account of leading EndProg
@@ -123,15 +124,17 @@ collectAndGenerateThreads gt (stmt : rest) currentAddr threadCounter =
 -- Generate thread body that can contain nested threads
 generateThreadBodyWithNested :: GlobalSymbolTable -> [Stmt] -> GlobalThreadsTable -> [Instruction]
 generateThreadBodyWithNested gt body nestedThreads = 
+    do 
     let -- Generate the thread's own code
         ownCode = concatMap (generateStmtCodeForThread gt nestedThreads 0) body
         -- Add nested thread bodies at the end
-        nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
+    let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
                                    generateThreadBodyWithNested gt nestedBody []) nestedThreads
     
     -- Concat everything and don't forget the EndProg
     -- TODO : ADD JOIN FLAG ?
-    in ownCode++nestedBodies
+    let rest = if not (null nestedBodies) then EndProg:nestedBodies else []
+    ownCode ++ rest 
 
 -- Like generateThreadBodyWithNested but for normal bodies e.g if body
 -- still supports nested threads
