@@ -4,7 +4,7 @@ module MyCodeGen
 import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 import Data.Char
-import qualified GHC.TypeLits as 0
+
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
 
@@ -59,7 +59,7 @@ allocateArrayMemory globalTable length =
 -- Second pass generates everything to get exact thread body sizes, 
 firstPassGeneration :: [Stmt] -> Int -> GlobalSymbolTable
 firstPassGeneration [] lc = []
-firstPassGeneration ((LockCreate ln):xs) lc = (ln,lockStartAddr+lc):firstPassGeneration xs lc+1
+firstPassGeneration ((LockCreate ln):xs) lc = (ln,lockStartAddr+lc):firstPassGeneration xs (lc+1)
 firstPassGeneration (_:xs) lc = firstPassGeneration xs lc
 
 
@@ -100,15 +100,15 @@ collectAndGenerateThreads gt (ThreadCreate body : rest) la threadCounter =
         -- Generate the actual thread body code (including nested threads)
     let threadBodyCode = generateThreadBodyWithNested gt body nestedThreads 
       -- Acquire join lock, decrement variable, free join lock
-      ++ [TestAndSet (DirAddr joinLockAddr), 
-          Receive r1,
-          Branch r1 (Rel 2), -- if 1, don't loop back
-          Jump (Rel -3), -- if we are here, it means it was 0, so loop back
-          Load (DirAddr joinLockAddr) r1,
-          Compute Decr r1 r1 r1,
-          WriteInstr r1 (DirAddr joinLockAddr),
-          WriteInstr reg0 (DirAddr joinLockAddr)
-        ] 
+          ++ [TestAndSet (DirAddr joinLockAddr), 
+              Receive r1,
+              Branch r1 (Rel 2), -- if 1, don't loop back
+              Jump (Rel (-3)), -- if we are here, it means it was 0, so loop back
+              Load (DirAddr joinLockAddr) r1,
+              Compute Decr r1 r1 r1,
+              WriteInstr r1 (DirAddr joinLockAddr),
+              WriteInstr reg0 (DirAddr joinLockAddr)
+            ] 
     let threadSize = length threadBodyCode
         
     -- Process remaining statements with updated thread counter
@@ -286,7 +286,7 @@ generateStmtCode globalTable tt _ (ThreadJoin) = [
           TestAndSet (DirAddr joinLockAddr), 
           Receive r1,
           Branch r1 (Rel 2), -- if 1, don't loop back
-          Jump (Rel -3)
+          Jump (Rel (-3))
           ]
 
 generateStmtCode globalTable tt _ (LockFree lockName) =
@@ -296,7 +296,7 @@ generateStmtCode globalTable tt _ (LockFree lockName) =
 
 generateStmtCode globalTable tt _ (LockGet lockName) =
   let lockAddr = getMemAddrFromTable lockName globalTable
-  in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel -3)] -- Acquire lock with test-and-set
+  in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] -- Acquire lock with test-and-set
 
 
 generateStmtCode gt tt la (ScopeBlock body) = generateNormalBodyWithNested gt body tt
