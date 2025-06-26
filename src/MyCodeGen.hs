@@ -457,7 +457,7 @@ outputAddress = 0xFFFF -- Fixed address for output operations
 
 codeGen :: [Stmt] -> [Instruction]
 codeGen ss = do
-  let (tt,body,la) = firstPassGeneration [] ss
+  let (tt,body,la) = secondPassGeneration (firstPassGeneration ss 0) ss
   let header = buildHeader tt
   header ++ body
 
