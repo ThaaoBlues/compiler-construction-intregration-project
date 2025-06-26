@@ -31,7 +31,8 @@
 - start thread (thread creation also automatically starts it)
 - join thread "esperamos:)"
 - global thread variable "global variable_name"
-- create lock "esclusa lock_name:)"
+- create lock "esclusa lock_name:)" 
+Locks creation must be used at the beginning of the main thread only
 - free lock "liberar lock_name:)"
 - get lock "obtener lock_name:)"
 

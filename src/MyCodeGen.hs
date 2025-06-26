@@ -4,6 +4,7 @@ module MyCodeGen
 import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 import Data.Char
+import qualified GHC.TypeLits as 0
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
 
@@ -54,13 +55,19 @@ allocateArrayMemory globalTable length =
 
 
 -- Two-Pass Generation :
--- First pass generates everything to get exact thread body sizes, 
--- Second pass uses real addresses to generate header
+-- First pass fills global symbol table with locks and everything
+-- Second pass generates everything to get exact thread body sizes, 
+firstPassGeneration :: [Stmt] -> Int -> GlobalSymbolTable
+firstPassGeneration [] lc = []
+firstPassGeneration ((LockCreate ln):xs) lc = (ln,lockStartAddr+lc):firstPassGeneration xs lc+1
+firstPassGeneration (_:xs) lc = firstPassGeneration xs lc
 
 
--- First pass: generate all code to determine exact sizes with proper nested thread handling
-firstPassGeneration :: GlobalSymbolTable -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)
-firstPassGeneration gt stmts = 
+
+
+-- Second pass: generate all code to determine exact sizes with proper nested thread handling
+secondPassGeneration :: GlobalSymbolTable -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)
+secondPassGeneration gt stmts = 
     do 
     let (threads, mainBody, _) = collectAndGenerateThreads gt stmts 0 0
     let headerSize = calculateHeaderSize threads
@@ -91,7 +98,17 @@ collectAndGenerateThreads gt (ThreadCreate body : rest) la threadCounter =
     let (nestedThreads, nestedBody, _) = collectAndGenerateThreads gt body (la+1) threadId
         
         -- Generate the actual thread body code (including nested threads)
-    let threadBodyCode = generateThreadBodyWithNested gt body nestedThreads
+    let threadBodyCode = generateThreadBodyWithNested gt body nestedThreads 
+      -- Acquire join lock, decrement variable, free join lock
+      ++ [TestAndSet (DirAddr joinLockAddr), 
+          Receive r1,
+          Branch r1 (Rel 2), -- if 1, don't loop back
+          Jump (Rel -3), -- if we are here, it means it was 0, so loop back
+          Load (DirAddr joinLockAddr) r1,
+          Compute Decr r1 r1 r1,
+          WriteInstr r1 (DirAddr joinLockAddr),
+          WriteInstr reg0 (DirAddr joinLockAddr)
+        ] 
     let threadSize = length threadBodyCode
         
     -- Process remaining statements with updated thread counter
@@ -167,13 +184,14 @@ calculateHeaderSize threads = do
     let setupSize = numThreads * 2  -- 2 instructions per thread setup
     let jumpLogicSize = 7  -- Fixed size for jump logic
     let branchSize = 1     -- Initial branch instruction
-    branchSize + jumpLogicSize + setupSize
+    let joinCounter = 2
+    branchSize + jumpLogicSize + setupSize + joinCounter
 
 
 generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode [] = [
         -- writeInstr WILL GO THERE
-
+          
          Jump (Rel 7)               -- Sprockell 0 jumps to skip thread repartition
          -- beginLoop
          , ReadInstr (IndAddr regSprID)
@@ -197,7 +215,10 @@ generateThreadJumpCode ((name,id,sa,body):ts) = [Load (ImmValue sa) regC,WriteIn
 buildHeader :: GlobalThreadsTable->[Instruction]
 -- length tt*2 corresponds to loads + write, 
 -- +2 corresponds to jump + actual target instruction
-buildHeader tt = Branch regSprID (Rel (length tt*2+2)): generateThreadJumpCode tt
+buildHeader tt = [Branch regSprID (Rel (length tt*2+2)),
+  Load (ImmValue (length tt)) r1 , 
+  WriteInstr r1 (DirAddr threadJoinAddr)]
+  ++ generateThreadJumpCode tt
 
 
 
@@ -205,6 +226,7 @@ buildHeader tt = Branch regSprID (Rel (length tt*2+2)): generateThreadJumpCode t
 generateStmtCode :: GlobalSymbolTable->GlobalThreadsTable->Int-> Stmt -> [Instruction]
 generateStmtCode gt _ _ (Declaration typ name) =
   case typ of
+    (Global Lock) -> [] -- locks are already taken care of
     (Global _) -> let (newGlobalTable, addr) = addGlobalVariable name typ gt
                   in []
     _ -> [Load (ImmValue 0) regB] -- For local variables, we need to manage registers
@@ -260,21 +282,21 @@ generateStmtCode globalTable tt _ (Print e) =
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
   in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 charIO]
 
-generateStmtCode globalTable tt _ (ThreadJoin) = []
-
-generateStmtCode globalTable tt _ (LockCreate lockName) =
-  let (newGlobalTable, addr) = addLock lockName globalTable
-  in []
-
+generateStmtCode globalTable tt _ (ThreadJoin) = [
+          TestAndSet (DirAddr joinLockAddr), 
+          Receive r1,
+          Branch r1 (Rel 2), -- if 1, don't loop back
+          Jump (Rel -3)
+          ]
 
 generateStmtCode globalTable tt _ (LockFree lockName) =
   let lockAddr = getMemAddrFromTable lockName globalTable
-  in [WriteInstr 0 (DirAddr lockAddr)] -- Release lock by writing 0
+  in [WriteInstr reg0 (DirAddr lockAddr)] -- Release lock by writing 0
 
 
 generateStmtCode globalTable tt _ (LockGet lockName) =
   let lockAddr = getMemAddrFromTable lockName globalTable
-  in [TestAndSet (DirAddr lockAddr), Receive r1] -- Acquire lock with test-and-set
+  in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel -3)] -- Acquire lock with test-and-set
 
 
 generateStmtCode gt tt la (ScopeBlock body) = generateNormalBodyWithNested gt body tt
@@ -387,6 +409,16 @@ r1 = regA
 r2 = regB
 r3 = regC
 
+threadJoinAddr :: MemAddr
+threadJoinAddr = 0xdead
+
+joinLockAddr :: MemAddr 
+joinLockAddr = 0xdeae
+
+lockStartAddr :: MemAddr
+lockStartAddr = 0x10FF
+
+
 outputAddress :: MemAddr
 outputAddress = 0xFFFF -- Fixed address for output operations
 
@@ -433,7 +465,6 @@ codeGen ss = do
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
 -- TODO : thread execution,thread join, local variables (register constraints), tests 
--- CHECK WHY threads in threads are are off-by-1 in starting address (except the dad one)
 
 
 
@@ -446,3 +477,7 @@ codeGen ss = do
 -- then we wait the answer with Recieve regX
 -- finally, we jump to the address in regX :)
  
+
+
+-- testAndSet atomically sets a variable to 1 if it is 0.
+-- if it was already 1, we get a 1 when we call Receive 
