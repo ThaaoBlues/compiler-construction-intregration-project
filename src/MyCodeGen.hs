@@ -464,8 +464,8 @@ codeGen ss = do
 
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
--- TODO : thread execution,thread join, local variables (register constraints), tests 
-
+-- TODO : thread join, local variables (register constraints), tests 
+-- Fix and check that we actually hit 0 with decrement
 
 
 --  Branch regSprID (Rel 6) 
