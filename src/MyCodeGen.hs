@@ -13,6 +13,45 @@ type ThreadInfo = (String, Int, Int, [Stmt])
 -- threads table
 type GlobalThreadsTable = [ThreadInfo]
 
+type LocalVarStack = [GlobalSymbolTable]
+
+-- Add local variable to head of display stack
+getFirstAvailableLocalVarAddr :: LocalVarStack->Int
+getFirstAvailableLocalVarAddr [] = localVarStartAddr
+getFirstAvailableLocalVarAddr (x:xs) | null x = getFirstAvailableLocalVarAddr xs
+  | otherwise = addr+1
+  where addr = foldl (\m (_,a)-> max m a) localVarStartAddr x
+  
+addLocalVariable :: LocalVarStack->String->LocalVarStack
+addLocalVariable st@(x:xs) name = ((name,availableAddr):x):xs
+  where availableAddr = getFirstAvailableLocalVarAddr st
+
+-- lookup display stack
+getMemAddrforLocalVar :: LocalVarStack->String-> MemAddr
+getMemAddrforLocalVar [] _ = error "Type checking missed a non defined variable reference ?? (never going to happen)"
+getMemAddrforLocalVar (x:xs) name = case lookup name x of
+    Just addr -> addr
+
+    Nothing -> getMemAddrforLocalVar xs name
+
+-- Returns nothing if variable is not found during lookup
+-- usefull if we don't know wether the variable is local or global
+getMemAddrforLocalVarMaybe :: LocalVarStack->String->Maybe MemAddr
+getMemAddrforLocalVarMaybe [] _ = Nothing
+getMemAddrforLocalVarMaybe (x:xs) name = case lookup name x of
+    Just addr -> Just addr
+    Nothing -> getMemAddrforLocalVarMaybe xs name
+
+
+-- Used when encountering a new body, add a level to the display stack
+newBlockInStack :: LocalVarStack->LocalVarStack
+newBlockInStack s = []:s
+
+-- Used when encountering a getting out of a body, remove a level to the display stack
+popBlockFromStack :: LocalVarStack->LocalVarStack
+popBlockFromStack = tail
+
+
 -- Add a global variable to the symbol table
 addGlobalVariable :: String -> Type -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
 addGlobalVariable name typ table =
@@ -24,9 +63,9 @@ addGlobalVariable name typ table =
 
 
 -- Get memory address for a given object
-getMemAddrFromTable :: String -> GlobalSymbolTable -> MemAddr
-getMemAddrFromTable name table =
-  case lookup name table of
+getMemAddrFromTable :: GlobalSymbolTable->String-> MemAddr
+getMemAddrFromTable gt name =
+  case lookup name gt of
     Just addr -> addr
     Nothing -> error ("Global variable not found: " ++ name)
 
@@ -57,14 +96,28 @@ allocateArrayMemory globalTable length =
 -- Two-Pass Generation :
 -- First pass fills global symbol table with locks and everything
 -- Second pass generates everything to get exact thread body sizes, 
-firstPassGeneration :: [Stmt] -> Int -> GlobalSymbolTable
-firstPassGeneration [] lc = []
-firstPassGeneration ((LockCreate ln):xs) lc = (ln,lockStartAddr+lc):firstPassGeneration xs (lc+1)
+firstPassGeneration :: [Stmt] -> Int -> (GlobalSymbolTable,LocalVarStack)
+firstPassGeneration [] lc = ([],[])
+
+firstPassGeneration ((LockCreate ln):xs) lc = do 
+  let (gt,st) = firstPassGeneration xs (lc+1) 
+  ((ln,lockStartAddr+lc):gt,st)
+
+firstPassGeneration ((Declaration typ name):xs) lc = do 
+  let (gt,st) = firstPassGeneration xs lc
+  -- different memory zones and tables for global and local variables
+  case typ of
+    (Global subtype)->let (gt2,_) = addGlobalVariable name subtype gt in (gt2,st)
+    _->(gt,addLocalVariable st name)
+
+
+-- stack in if/while/thread bodies is extended and filled right before opening it
+
 firstPassGeneration (_:xs) lc = firstPassGeneration xs lc
 
 
 
-
+-- TODO : ADD Stack for local variables passing in second pass
 -- Second pass: generate all code to determine exact sizes with proper nested thread handling
 secondPassGeneration :: GlobalSymbolTable -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)
 secondPassGeneration gt stmts = 
@@ -226,26 +279,39 @@ buildHeader tt = [Branch regSprID (Rel (length tt*2+2)),
 
 
 -- Generate code for a statement
-generateStmtCode :: GlobalSymbolTable->GlobalThreadsTable->Int-> Stmt -> [Instruction]
-generateStmtCode gt _ _ (Declaration typ name) =
+generateStmtCode :: GlobalSymbolTable->LocalVarStack->GlobalThreadsTable->Int-> Stmt -> [Instruction]
+generateStmtCode gt st _ _ (Declaration typ name) = 
   case typ of
+    -- Variable declaration is already taken care of, 
+    -- we just add initialisation to 0 for locals
     (Global Lock) -> [] -- locks are already taken care of
-    (Global _) -> let (newGlobalTable, addr) = addGlobalVariable name typ gt
-                  in []
-    _ -> [Load (ImmValue 0) regB] -- For local variables, we need to manage registers
+    (Global _) -> []
+    _ -> [Load (ImmValue 0) r1,Store r1 (DirAddr $ getMemAddrforLocalVar st name)]
 
-
--- TODO : FIX THIS WITH REGISTERS ALLOCATION
-generateStmtCode gt tt _ (Assignment var expr) =
+generateStmtCode gt st tt _ (Assignment name expr) =
   do
-  let exprCode = generateExprCode gt expr
-  let varAddr = getMemAddrFromTable var gt
-  exprCode ++ [Pop r1,Store r1 (DirAddr varAddr)]
+  let exprCode = generateExprCode gt st expr
+
+  -- TODO : differentiate the case of local vars from global ones
+  -- (Store vs WriteInstr)
+  -- priority is given on local vars in case of name collision
+
+  let result = getMemAddrforLocalVarMaybe st name
+  case result of
+    -- Name refers to a global variable
+    Nothing -> do 
+      let varAddr = getMemAddrFromTable gt name
+      exprCode ++ [Pop r1,WriteInstr r1 (DirAddr varAddr)]
+
+    -- Local one
+    (Just addr)-> exprCode ++ [Pop r1,Store r1 (DirAddr addr)]
+
+  
 
 
-generateStmtCode gt tt la (If cond body1 body2) =
+generateStmtCode gt st tt _ (If cond body1 body2) =
   do
-    let condCode = generateExprCode gt cond
+    let condCode = generateExprCode gt st cond
     let elseBodyCode = generateNormalBodyWithNested gt body2 tt
     let ifBodyCode = generateNormalBodyWithNested gt body1 tt
         -- We use NOP as a fallback for condition as wReceive 2,Compute Eque don't know anything about what's after
@@ -253,12 +319,12 @@ generateStmtCode gt tt la (If cond body1 body2) =
       ++ elseBodyCode
       ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
       ++ ifBodyCode 
-      ++ [Nop] -- Placeholder for end of condition
+      ++ [Nop] -- Fallback for end of condition
 
 
-generateStmtCode gt tt la (While cond body) =
+generateStmtCode gt st tt _ (While cond body) =
   do 
-    let condCode = generateExprCode gt cond
+    let condCode = generateExprCode gt st cond
     let bodyCode = generateNormalBodyWithNested gt body tt
     let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
@@ -280,29 +346,29 @@ generateStmtCode gt tt la (While cond body) =
 --   in exprCode ++ [WriteInstr r1 charIO]
 
 -- Print number
-generateStmtCode globalTable tt _ (Print e) =
-  let exprCode = generateExprCode globalTable e
+generateStmtCode gt st tt _ (Print e) =
+  let exprCode = generateExprCode gt st e
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
   in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 charIO]
 
-generateStmtCode globalTable tt _ (ThreadJoin) = [
+generateStmtCode _ _ _ _ (ThreadJoin) = [
           TestAndSet (DirAddr joinLockAddr), 
           Receive r1,
           Branch r1 (Rel 2), -- if 1, don't loop back
           Jump (Rel (-3))
           ]
 
-generateStmtCode globalTable tt _ (LockFree lockName) =
-  let lockAddr = getMemAddrFromTable lockName globalTable
+generateStmtCode gt _ _ _ (LockFree lockName) =
+  let lockAddr = getMemAddrFromTable gt lockName
   in [WriteInstr reg0 (DirAddr lockAddr)] -- Release lock by writing 0
 
 
-generateStmtCode globalTable tt _ (LockGet lockName) =
-  let lockAddr = getMemAddrFromTable lockName globalTable
+generateStmtCode gt _ _ _ (LockGet lockName) =
+  let lockAddr = getMemAddrFromTable gt lockName
   in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] -- Acquire lock with test-and-set
 
 
-generateStmtCode gt tt la (ScopeBlock body) = generateNormalBodyWithNested gt body tt
+generateStmtCode gt st tt la (ScopeBlock body) = generateNormalBodyWithNested gt body tt
 
 
 
@@ -310,21 +376,30 @@ generateStmtCode gt tt la (ScopeBlock body) = generateNormalBodyWithNested gt bo
 
 
 -- Generate code for an expression
-generateExprCode :: GlobalSymbolTable -> Expr -> [Instruction]
+generateExprCode :: GlobalSymbolTable->LocalVarStack-> Expr -> [Instruction]
 
-generateExprCode _ (IntLit n) = [Load (ImmValue (fromIntegral n)) r1, Push r1]
--- store booleans as int in {0,1}
-generateExprCode _ (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1, Push r1]
+generateExprCode _ _ (IntLit n) = [Load (ImmValue (fromIntegral n)) r1, Push r1]
+-- Store booleans as int in {0,1}
+generateExprCode _ _ (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1, Push r1]
 
-generateExprCode gt (Var varName) =
-  let varAddr = getMemAddrFromTable varName gt
-  in [Load (DirAddr varAddr) r1, Push r1]
+generateExprCode gt st (Var name) = do
+
+    let result = getMemAddrforLocalVarMaybe st name
+    case result of
+
+      -- Name refers to a global variable
+      Nothing -> do 
+        let varAddr = getMemAddrFromTable gt name
+        [Receive r1,Push r1]
+
+      -- Local one
+      (Just addr)->[Load (DirAddr addr) r1, Push r1]
 
 
-generateExprCode gt (BinOp op e1 e2) =
+generateExprCode gt st (BinOp op e1 e2) =
   do
-  let e1Code = generateExprCode gt e1
-  let e2Code = generateExprCode gt e2
+  let e1Code = generateExprCode gt st e1
+  let e2Code = generateExprCode gt st e2
   let opCode = case op of
         MyParser.Add -> Sprockell.Add
         MyParser.Sub -> Sprockell.Sub
@@ -349,9 +424,9 @@ generateExprCode gt (BinOp op e1 e2) =
 
 
 
-generateExprCode gt (UnOp op e) =
+generateExprCode gt st (UnOp op e) =
   do
-  let eCode = generateExprCode gt e
+  let eCode = generateExprCode gt st e
   let computeCode = 
         case op of
           -- Booleans are ints in {0,1} so we need to make ifs
@@ -376,19 +451,19 @@ generateExprCode gt (UnOp op e) =
 
   eCode ++ computeCode
 
-generateExprCode gt (Paren e) = generateExprCode gt e
+generateExprCode gt st (Paren e) = generateExprCode gt st e
 
-generateExprCode gt (ArrayLit exprs) =
-  let exprCodes = map (generateExprCode gt) exprs
+generateExprCode gt st (ArrayLit exprs) =
+  let exprCodes = map (generateExprCode gt st) exprs
       arrayLength = length exprs
       arrayAddr = allocateArrayMemory gt arrayLength
 
   -- Index of expression is also offset in array, as we assume one address point on 4 bytes ;)
   in concatMap (\ (idx, exprCode) -> exprCode ++ [Store r1 (DirAddr (arrayAddr + idx))]) (zip [0..] exprCodes)
 
-generateExprCode gt (ArrayAccess arrayName indexExpr) =
-  let indexCode = generateExprCode gt indexExpr
-      arrayAddr = getMemAddrFromTable arrayName gt
+generateExprCode gt st (ArrayAccess arrayName indexExpr) =
+  let indexCode = generateExprCode gt st indexExpr
+      arrayAddr = getMemAddrFromTable gt arrayName
 
   in indexCode ++ [Load (DirAddr (arrayAddr + r1)) r1,Push r1] -- Load array element at address arrayAddr + index
 
@@ -421,9 +496,8 @@ joinLockAddr = 0xdeae
 lockStartAddr :: MemAddr
 lockStartAddr = 0x10FF
 
-
-outputAddress :: MemAddr
-outputAddress = 0xFFFF -- Fixed address for output operations
+localVarStartAddr :: MemAddr
+localVarStartAddr = 0x1111
 
 -- Generate a full program with multiple Sprockells
 --generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
@@ -467,9 +541,7 @@ codeGen ss = do
 
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
--- TODO : thread join, local variables (register constraints), tests 
--- Fix and check that we actually hit 0 with decrement
-
+-- TODO : local variables (register constraints), tests 
 
 --  Branch regSprID (Rel 6) 
 -- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
