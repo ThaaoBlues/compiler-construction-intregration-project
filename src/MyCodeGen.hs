@@ -23,6 +23,7 @@ getFirstAvailableLocalVarAddr (x:xs) | null x = getFirstAvailableLocalVarAddr xs
   where addr = foldl (\m (_,a)-> max m a) localVarStartAddr x
   
 addLocalVariable :: LocalVarStack->String->LocalVarStack
+addLocalVariable [] name = [[(name,localVarStartAddr)]]
 addLocalVariable st@(x:xs) name = ((name,availableAddr):x):xs
   where availableAddr = getFirstAvailableLocalVarAddr st
 
@@ -121,6 +122,7 @@ fillLocalDisplayForThisBody :: LocalVarStack->[Stmt] -> LocalVarStack
 fillLocalDisplayForThisBody st [] = st 
 fillLocalDisplayForThisBody st ((Declaration typ name):xs) = addLocalVariable st2 name
   where st2 = fillLocalDisplayForThisBody st xs 
+fillLocalDisplayForThisBody st _ = st 
 
 
 
@@ -158,14 +160,18 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let threadName = "thread_" ++ show threadId ++ "_body"
         
     let joinLockMechanismSize = 8
+
+    
+    -- push and fill a new level on local variables display stack
+    let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body 
     -- RECURSIVELY collect nested threads from the thread body
     -- Don't forget to add join counter decrement mechanism size
     -- so the calculated parent thread body length for NESTED threads 
     -- is the right one (i.e not having only the "thread logic" length as start address offset)
-    let (nestedThreads, _, _) = collectAndGenerateThreads gt st body (la+1+joinLockMechanismSize) threadId
+    let (nestedThreads, _, _) = collectAndGenerateThreads gt st2 body (la+1+joinLockMechanismSize) threadId
         
     -- Generate the actual thread body code (including nested threads)
-    let threadBodyCode = generateThreadBodyWithNested gt st body nestedThreads 
+    let threadBodyCode = generateThreadBodyWithNested gt st2 body nestedThreads 
 
     let threadSize = length threadBodyCode
     -- Process remaining statements with updated thread counter
@@ -174,10 +180,10 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                          else maximum (map (\(_, tid, _, _) -> tid) nestedThreads)
         
     -- +1 for EndProg addition
-    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + threadSize+1) maxNestedId
+    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st2 rest (la + threadSize+1) maxNestedId
         
     -- Concat this thread, all its nested threads and all the ones in following statements
-    -- la+1 for taking account of leading EndProg
+    -- la+1 for taking account of leading EndPro"g
     let thisThread = (threadName, threadId, la+1, body)
     let allThreads = thisThread : nestedThreads ++ restThreads
         
@@ -201,8 +207,12 @@ collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
 generateThreadBodyWithNested :: GlobalSymbolTable->LocalVarStack-> [Stmt] -> GlobalThreadsTable -> [Instruction]
 generateThreadBodyWithNested gt st body nestedThreads = 
     do 
+
+
+
     let -- Generate the thread's own code
         ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
+
           -- Acquire join lock, decrement variable, free join lock
           ++ [TestAndSet (DirAddr joinLockAddr), 
               Receive r1,
@@ -214,8 +224,16 @@ generateThreadBodyWithNested gt st body nestedThreads =
               WriteInstr reg0 (DirAddr joinLockAddr)
             ]
         -- Add nested thread bodies at the end
+
+    
+
     let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
-                                   generateThreadBodyWithNested gt st nestedBody []) nestedThreads
+                                  do
+                                    -- push and fill a new level on local variables display stack
+                                    let st2 = fillLocalDisplayForThisBody (newBlockInStack st) nestedBody 
+                                    generateThreadBodyWithNested gt st2 nestedBody []) 
+                                
+                                nestedThreads
     
     -- Concat everything
     let rest = if not (null nestedBodies) then EndProg:nestedBodies else []
@@ -351,6 +369,8 @@ generateStmtCode gt st tt _ (While cond body) =
       ++ [Branch r1 (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] 
       ++ bodyCode ++ [Jump (Rel (-loopStart))] 
       ++ [Nop]
+
+    
 
 
 
@@ -514,38 +534,6 @@ lockStartAddr = 0x10FF
 localVarStartAddr :: MemAddr
 localVarStartAddr = 0x1111
 
--- Generate a full program with multiple Sprockells
---generateFullProgram :: GlobalSymbolTable -> [Stmt] -> [[Instruction]]
---generateFullProgram = generateCode
-
--- main :: IO ()
--- main = do
---   let programText = unlines [
---         "global entero a:)",
---         "esclusa lock1:)",
---         "a = 5:)",
---         "imprimir ¡a!:)",
---         "hilo {",
---         "  obtener lock1:)",
---         "  a = a + 1:)",
---         "  liberar lock1:)",
---         "}",
---         "esperamos:)"
---        ]
---   case parseMyLang programText of
---     Left err -> print err
---     Right program -> do
---       let initialGlobalTable = []
---           (globalTable, _) = foldl (\(table, _) stmt ->
---                                     case stmt of
---                                       Declaration (Global _) name -> addGlobalVariable name (Global Entero) table
---                                       LockCreate name -> addLock name table
---                                       _ -> (table, ()))
---                                   (initialGlobalTable, ())
---                                   program
---           instructions = generateCode globalTable program
---       putStrLn "Generated Sprockell Instructions:"
---       mapM_ print instructions
 
 codeGen :: [Stmt] -> [Instruction]
 codeGen ss = do
@@ -557,7 +545,7 @@ codeGen ss = do
 
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
--- TODO : local variables (register constraints), tests 
+-- TODO : fix creation of new level for each nested threads, tests 
 
 --  Branch regSprID (Rel 6) 
 -- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
