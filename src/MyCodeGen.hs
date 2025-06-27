@@ -186,6 +186,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter = 
     do 
+      -- TODO : Check if it is still logic to put empty thread table here
     let stmtCode = generateStmtCode gt st [] currentAddr stmt
     let stmtSize = length stmtCode 
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (currentAddr + stmtSize) threadCounter
@@ -240,6 +241,8 @@ generateStmtCodeForThread gt _ nestedThreads la (ThreadCreate body) =
     -- When we encounter a ThreadCreate inside a thread, it should be handled
     -- by the nested thread system, so we don't generate code here
     []
+
+-- TODO : Check if it is still logic to put empty thread table here
 generateStmtCodeForThread gt st nestedThreads la stmt = 
     generateStmtCode gt st [] la stmt
 
