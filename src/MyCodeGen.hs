@@ -94,23 +94,17 @@ collectAndGenerateThreads gt (ThreadCreate body : rest) la threadCounter =
     let threadId = threadCounter + 1
     let threadName = "thread_" ++ show threadId ++ "_body"
         
+    let joinLockMechanismSize = 8
     -- RECURSIVELY collect nested threads from the thread body
-    let (nestedThreads, nestedBody, _) = collectAndGenerateThreads gt body (la+1) threadId
+    -- Don't forget to add join counter decrement mechanism size
+    -- so the calculated parent thread body length for NESTED threads 
+    -- is the right one (i.e not having only the "thread logic" length as start address offset)
+    let (nestedThreads, _, _) = collectAndGenerateThreads gt body (la+1+joinLockMechanismSize) threadId
         
-        -- Generate the actual thread body code (including nested threads)
+    -- Generate the actual thread body code (including nested threads)
     let threadBodyCode = generateThreadBodyWithNested gt body nestedThreads 
-      -- Acquire join lock, decrement variable, free join lock
-          ++ [TestAndSet (DirAddr joinLockAddr), 
-              Receive r1,
-              Branch r1 (Rel 2), -- if 1, don't loop back
-              Jump (Rel (-3)), -- if we are here, it means it was 0, so loop back
-              Load (DirAddr joinLockAddr) r1,
-              Compute Decr r1 r1 r1,
-              WriteInstr r1 (DirAddr joinLockAddr),
-              WriteInstr reg0 (DirAddr joinLockAddr)
-            ] 
+
     let threadSize = length threadBodyCode
-        
     -- Process remaining statements with updated thread counter
     let maxNestedId = if null nestedThreads 
                          then threadId 
@@ -138,18 +132,28 @@ collectAndGenerateThreads gt (stmt : rest) currentAddr threadCounter =
     (restThreads, stmtCode ++ restCode, finalAddr)
 
 
+
 -- Generate thread body that can contain nested threads
 generateThreadBodyWithNested :: GlobalSymbolTable -> [Stmt] -> GlobalThreadsTable -> [Instruction]
 generateThreadBodyWithNested gt body nestedThreads = 
     do 
     let -- Generate the thread's own code
         ownCode = concatMap (generateStmtCodeForThread gt nestedThreads 0) body
+          -- Acquire join lock, decrement variable, free join lock
+          ++ [TestAndSet (DirAddr joinLockAddr), 
+              Receive r1,
+              Branch r1 (Rel 2), -- if 1, don't loop back
+              Jump (Rel (-3)), -- if we are here, it means it was 0, so loop back
+              Load (DirAddr joinLockAddr) r1,
+              Compute Decr r1 r1 r1,
+              WriteInstr r1 (DirAddr joinLockAddr),
+              WriteInstr reg0 (DirAddr joinLockAddr)
+            ]
         -- Add nested thread bodies at the end
     let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
                                    generateThreadBodyWithNested gt nestedBody []) nestedThreads
     
-    -- Concat everything and don't forget the EndProg
-    -- TODO : ADD JOIN FLAG ?
+    -- Concat everything
     let rest = if not (null nestedBodies) then EndProg:nestedBodies else []
     ownCode ++ rest 
 
@@ -186,7 +190,6 @@ calculateHeaderSize threads = do
     let branchSize = 1     -- Initial branch instruction
     let joinCounter = 2
     branchSize + jumpLogicSize + setupSize + joinCounter
-
 
 generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode [] = [
