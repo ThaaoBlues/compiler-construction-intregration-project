@@ -162,19 +162,21 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let joinLockMechanismSize = 8
 
     -- /!\ Don't be fooled ! When two nested threads are created
-    -- and share the same nesting level, they will have THE SAME MEMORY ADDRESSES 
-    -- for local variables, as the local memory is not shared between 
+    -- they will have THE SAME MEMORY ADDRESSES for local variables, 
+    -- as the local memory is not shared between 
     -- THIS IS COMPLETELY NORMAL
     -- (I lost my mind trying to fix a bug that was ultimately my own brain logic skill issue)
-
+    
     
     -- push and fill a new level on local variables display stack
-    let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body 
+    -- stack is brand new as thread will run on separate processor !
+    let st2 = fillLocalDisplayForThisBody [] body 
+
     -- RECURSIVELY collect nested threads from the thread body
     -- Don't forget to add join counter decrement mechanism size
     -- so the calculated parent thread body length for NESTED threads 
     -- is the right one (i.e not having only the "thread logic" length as start address offset)
-    let (nestedThreads, _, _) = collectAndGenerateThreads gt st2 body (la+1+joinLockMechanismSize) threadId
+    let (nestedThreads, _, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize) threadId
         
     -- Generate the actual thread body code (including nested threads)
     let threadBodyCode = generateThreadBodyWithNested gt st2 body nestedThreads 
@@ -186,7 +188,8 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                          else maximum (map (\(_, tid, _, _) -> tid) nestedThreads)
         
     -- +1 for EndProg addition
-    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st2 rest (la + threadSize+1) maxNestedId
+    -- same nesting level, keep former display
+    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + threadSize+1) maxNestedId
         
     -- Concat this thread, all its nested threads and all the ones in following statements
     -- la+1 for taking account of leading EndProg
@@ -236,7 +239,7 @@ generateThreadBodyWithNested gt st body nestedThreads =
     let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
                                   do
                                     -- push and fill a new level on local variables display stack
-                                    let st2 = fillLocalDisplayForThisBody (newBlockInStack st) nestedBody 
+                                    let st2 = fillLocalDisplayForThisBody [] nestedBody 
                                     generateThreadBodyWithNested gt st2 nestedBody []) 
                                 
                                 nestedThreads
@@ -253,7 +256,7 @@ generateNormalBodyWithNested gt st body nestedThreads = do
     let ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
         -- Add nested thread bodies at the end
     let nestedBodies = concatMap (\(_, _, _, nestedBody) -> do
-                                    let st2 = fillLocalDisplayForThisBody (newBlockInStack st) nestedBody
+                                    let st2 = fillLocalDisplayForThisBody [] nestedBody
                                     generateThreadBodyWithNested gt st2 nestedBody []
                                   ) 
                                     

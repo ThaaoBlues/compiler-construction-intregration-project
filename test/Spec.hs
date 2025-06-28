@@ -225,7 +225,7 @@ codeGenSpec = describe "Code generation" $ do
     
     
     it "multiple nested thread creation" $ do 
-        let prog = "entero x:) hilo { entero x:) hilo {entero x:) hilo {entero x:) hilo {entero x:)} } }}"
+        let prog = "entero x:) hilo { entero x:) hilo { entero x:) hilo { entero x:) entero y:) hilo { entero x:) } } } }"
         
         let ast = case parseMyLang prog of
                 (Left e) -> error (show e)
