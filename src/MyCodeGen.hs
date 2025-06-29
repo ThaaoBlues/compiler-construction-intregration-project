@@ -4,6 +4,7 @@ module MyCodeGen
 import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 import Data.Char
+import Test.QuickCheck.Text (number)
 
 -- Global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
@@ -361,7 +362,7 @@ generateStmtCode gt st tt _ (If cond body1 body2) =
     let elseBodyCode = generateNormalBodyWithNested gt st1 body2 tt
     let ifBodyCode = generateNormalBodyWithNested gt st2 body1 tt
         -- We use NOP as a fallback for condition as wReceive 2,Compute Eque don't know anything about what's after
-    condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 1))] -- Jump to If 
+    condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
       ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
       ++ ifBodyCode 
@@ -397,7 +398,7 @@ generateStmtCode gt st tt _ (While cond body) =
 generateStmtCode gt st tt _ (Print e) =
   let exprCode = generateExprCode gt st e
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
-  in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 charIO]
+  in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 numberIO]
 
 generateStmtCode _ _ _ _ (ThreadJoin) = [
           TestAndSet (DirAddr joinLockAddr), 
@@ -558,7 +559,7 @@ codeGen ss = do
 
   -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
--- TODO : fix creation of new level for each nested threads, tests 
+-- TODO : tests 
 
 --  Branch regSprID (Rel 6) 
 -- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
