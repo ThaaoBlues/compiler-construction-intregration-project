@@ -536,17 +536,18 @@ r1 = regA
 r2 = regB
 r3 = regC
 
+-- In global memory
 threadJoinAddr :: MemAddr
 threadJoinAddr = 0xdead
-
+-- In global memory
 joinLockAddr :: MemAddr 
 joinLockAddr = 0xdeae
-
+-- In global memory
 lockStartAddr :: MemAddr
 lockStartAddr = 0x10FF
-
+-- In local memory
 localVarStartAddr :: MemAddr
-localVarStartAddr = 0x1111
+localVarStartAddr = 0x000a
 
 
 codeGen :: [Stmt] -> [Instruction]

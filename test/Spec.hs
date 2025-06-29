@@ -179,18 +179,17 @@ codeGenSpec = describe "Code generation" $ do
                 (Left _) -> error "Parse error"
                 (Right tree) -> tree  
 
-        let st = fillSymbolTable ast
         codeGen ast `shouldBe` [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65536),EndProg]
     
     it "basic if/else program" $ do 
-        let prog = "si verdad { imprimir ¡5! :) } sino { imprimir ¡10! :) }"
+        let prog = "entero x:) x=168:) si verdad { imprimir ¡x! :) } sino { imprimir ¡10! :) }"
         let ast = case parseMyLang prog of
-                (Left _) -> error "Parse error"
+                (Left s) -> error (show s)
                 (Right tree) -> tree  
 
-        let st = fillSymbolTable ast
-        codeGen ast `shouldBe` [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 18),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65536),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65536),Nop,EndProg]
-    
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),Load (ImmValue 168) 2,Push 2,Pop 2,Store 2 (DirAddr 10),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 18),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65536),Jump (Rel 17),Load (DirAddr 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65536),Nop,EndProg]
+
+
     it "basic thread creation" $ do 
         let prog = "entero x:) hilo { entero x:)}"
         
@@ -198,9 +197,7 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        let st = fillSymbolTable ast
-        codeGen ast `shouldBe` [Branch 1 (Rel 4),Load (ImmValue 1) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 15) 4,WriteInstr 4 (DirAddr 1),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
-
+        codeGen ast `shouldBe` [Branch 1 (Rel 4),Load (ImmValue 1) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 15) 4,WriteInstr 4 (DirAddr 1),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
     it "multiple non-nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:)} hilo { entero x:)} hilo { entero x:)}"
         
@@ -208,8 +205,9 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        let st = fillSymbolTable ast
-        codeGen ast `shouldBe` [Branch 1 (Rel 8),Load (ImmValue 3) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 19) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 30) 4,WriteInstr 4 (DirAddr 2),Load (ImmValue 41) 4,WriteInstr 4 (DirAddr 3),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
+        codeGen ast `shouldBe` [Branch 1 (Rel 8),Load (ImmValue 3) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 19) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 30) 4,WriteInstr 4 (DirAddr 2),Load (ImmValue 41) 4,WriteInstr 4 (DirAddr 3),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]    
+    
+    
     it "2 nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:) hilo {entero x:)}}"
         
@@ -217,9 +215,9 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        let st = fillSymbolTable ast
-        codeGen ast `shouldBe` [Branch 1 (Rel 6),Load (ImmValue 2) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 17) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 28) 4,WriteInstr 4 (DirAddr 2),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]    
-    
+        codeGen ast `shouldBe` [Branch 1 (Rel 6),Load (ImmValue 2) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 17) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 28) 4,WriteInstr 4 (DirAddr 2),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
+
+
     it "multiple nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:) hilo { entero x:) hilo { entero x:) entero y:) hilo { entero x:) } } } }"
         
@@ -227,8 +225,10 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        let st = fillSymbolTable ast
-        codeGen ast `shouldBe`[Branch 1 (Rel 10),Load (ImmValue 4) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 21) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 32) 4,WriteInstr 4 (DirAddr 2),Load (ImmValue 43) 4,WriteInstr 4 (DirAddr 3),Load (ImmValue 56) 4,WriteInstr 4 (DirAddr 4),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),Load (ImmValue 0) 2,Store 2 (DirAddr 4370),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),Load (ImmValue 0) 2,Store 2 (DirAddr 4369),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
+        codeGen ast `shouldBe`[Branch 1 (Rel 10),Load (ImmValue 4) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 21) 4,WriteInstr 4 (DirAddr 1),Load (ImmValue 32) 4,WriteInstr 4 (DirAddr 2),Load (ImmValue 43) 4,WriteInstr 4 (DirAddr 3),Load (ImmValue 56) 4,WriteInstr 4 (DirAddr 4),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),Load (ImmValue 0) 2,Store 2 (DirAddr 11),Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
+
+
+
 
 main :: IO ()
 main = hspec $ do
