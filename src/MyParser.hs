@@ -183,7 +183,7 @@ scopeBlock = do
   beginScope
   blockContent <- many statement
   endScope
-  symbol ":)"
+  --symbol ":)"
   return $ ScopeBlock blockContent
 
 -- Parser for statements
