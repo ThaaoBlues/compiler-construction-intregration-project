@@ -123,7 +123,7 @@ fillLocalDisplayForThisBody :: LocalVarStack->[Stmt] -> LocalVarStack
 fillLocalDisplayForThisBody st [] = st 
 fillLocalDisplayForThisBody st ((Declaration typ name):xs) = addLocalVariable st2 name
   where st2 = fillLocalDisplayForThisBody st xs 
-fillLocalDisplayForThisBody st _ = st 
+fillLocalDisplayForThisBody st (x:xs) = fillLocalDisplayForThisBody st xs
 
 
 
@@ -357,8 +357,8 @@ generateStmtCode gt st tt _ (If cond body1 body2) =
     let st1 = fillLocalDisplayForThisBody (newBlockInStack st) body1
     let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body2
     let condCode = generateExprCode gt st cond
-    let elseBodyCode = generateNormalBodyWithNested gt st1 body2 tt
-    let ifBodyCode = generateNormalBodyWithNested gt st2 body1 tt
+    let elseBodyCode = generateNormalBodyWithNested gt st2 body2 tt
+    let ifBodyCode = generateNormalBodyWithNested gt st1 body1 tt
         -- We use NOP as a fallback for condition as wReceive 2,Compute Eque don't know anything about what's after
     condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
@@ -369,17 +369,18 @@ generateStmtCode gt st tt _ (If cond body1 body2) =
 
 generateStmtCode gt st tt _ (While cond body) =
   do 
+    let stw = fillLocalDisplayForThisBody (newBlockInStack st) body
     let condCode = generateExprCode gt st cond
-    let bodyCode = generateNormalBodyWithNested gt st body tt
-    let loopStart = length bodyCode + length condCode + 4
+    let bodyCode = generateNormalBodyWithNested gt stw body tt
+    -- let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
 
   -- same here as for condition, NOP as fallback after while
-    [Jump (Rel loopStart)] 
-      ++ condCode 
+    --[Jump (Rel loopStart)] 
+    condCode 
       ++ [Pop r1]
-      ++ [Branch r1 (Rel (length bodyCode + 1)), Jump (Rel (length bodyCode + 2))] 
-      ++ bodyCode ++ [Jump (Rel (-loopStart))] 
+      ++ [Branch r1 (Rel 2), Jump (Rel (length bodyCode + 2))] 
+      ++ bodyCode ++ [Jump (Rel (-loopEnd))] 
       ++ [Nop]
 
     
@@ -461,9 +462,9 @@ generateExprCode gt st (BinOp op e1 e2) =
         MyParser.Or -> Sprockell.Or
         _ -> error "Unsupported operation"
   e1Code -- assume expression always push result to stack
-    ++ [Pop r1] 
-    ++ e2Code 
-    ++ [Pop r2]
+    ++ e2Code
+    ++ [Pop r2]  
+    ++ [Pop r1]
     -- Assume e1 is in r1, e2 in r2, result in r3
     ++ [Compute opCode r1 r2 r3]
     -- put result in stack
