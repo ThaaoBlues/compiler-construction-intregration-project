@@ -120,7 +120,6 @@ typeCheckerSpec = describe "Type Checker" $ do
                     ]
             checkTypeInvalid stmts
 
-        -- DO WE ACCEPT NON HOMOGENEOUS TYPES ?? I THINK SO BUT IT SEEMS WEIRD
         it "rejects an invalid array" $ do
             let stmts = [
                     Declaration (Array Entero) "arr",
@@ -174,7 +173,7 @@ typeCheckerSpec = describe "Type Checker" $ do
 codeGenSpec :: Spec
 codeGenSpec = describe "Code generation" $ do
     it "basic print program" $ do 
-        let prog = "imprimir¡5!:)"
+        let prog = "imprimir¡5!:) /* test de commentaire */"
         let ast = case parseMyLang prog of
                 (Left _) -> error "Parse error"
                 (Right tree) -> tree  
