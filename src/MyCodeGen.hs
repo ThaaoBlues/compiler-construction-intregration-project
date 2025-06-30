@@ -10,7 +10,7 @@ import Test.QuickCheck.Text (number)
 type GlobalSymbolTable = [(String, MemAddr)]
 
 -- Thread info: (name, threadId, startAddress, body)
-type ThreadInfo = (String, Int, Int, [Stmt])
+type ThreadInfo = (Int, Int, [Stmt])
 -- threads table
 type GlobalThreadsTable = [ThreadInfo]
 
@@ -145,7 +145,7 @@ secondPassGeneration gt st stmts =
         -- to discover their sizes, 
         -- as precedent thread size obviously influence following thread start address
 
-    let adjustedThreads = map (\(name, tid, addr, body) -> (name, tid, addr + headerSize, body)) threads
+    let adjustedThreads = map (\(tid, addr, body) -> (tid, addr + headerSize, body)) threads
     (adjustedThreads, mainBody++[EndProg], headerSize)
 
 -- Collect threads and generate their bodies in first pass (with thread counter)
@@ -158,7 +158,6 @@ collectAndGenerateThreads _ _ [] la _ = ([], [], la)
 collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter = 
     do 
     let threadId = threadCounter + 1
-    let threadName = "thread_" ++ show threadId ++ "_body"
         
     let joinLockMechanismSize = 8
 
@@ -186,7 +185,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- Process remaining statements with updated thread counter
     let maxNestedId = if null nestedThreads 
                          then threadId 
-                         else maximum (map (\(_, tid, _, _) -> tid) nestedThreads)
+                         else maximum (map (\(tid, _, _) -> tid) nestedThreads)
         
     -- +1 for EndProg addition
     -- same nesting level, keep former display
@@ -194,7 +193,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
         
     -- Concat this thread, all its nested threads and all the ones in following statements
     -- la+1 for taking account of leading EndProg
-    let thisThread = (threadName, threadId, la+1, body)
+    let thisThread = (threadId, la+1, body)
     let allThreads = thisThread : nestedThreads ++ restThreads
         
     -- Return updated thread table, current generated code and last address used
@@ -237,7 +236,7 @@ generateThreadBodyWithNested gt st body nestedThreads =
 
     
 
-    let nestedBodies = concatMap (\(_, _, _, nestedBody) -> 
+    let nestedBodies = concatMap (\(_, _, nestedBody) -> 
                                   do
                                     -- push and fill a new level on local variables display stack
                                     let st2 = fillLocalDisplayForThisBody [] nestedBody 
@@ -256,11 +255,10 @@ generateNormalBodyWithNested gt st body nestedThreads = do
     -- Generate the body's own code
     let ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
         -- Add nested thread bodies at the end
-    let nestedBodies = concatMap (\(_, _, _, nestedBody) -> do
+    let nestedBodies = concatMap (\(_, _, nestedBody) -> do
                                     let st2 = fillLocalDisplayForThisBody [] nestedBody
                                     generateThreadBodyWithNested gt st2 nestedBody []
-                                  ) 
-                                    
+                                  )    
                                   nestedThreads
     
     ownCode ++ nestedBodies
@@ -307,7 +305,7 @@ generateThreadJumpCode [] = [
        ]
 
 -- (name, threadId, startAddress, body)
-generateThreadJumpCode ((name,id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr id)]
+generateThreadJumpCode ((id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr id)]
   ++ generateThreadJumpCode ts
 
 
