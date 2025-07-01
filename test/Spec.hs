@@ -421,11 +421,12 @@ main = {-hspec $-} do
     -- let prog = [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
     -- Sprockell.run [prog]
     -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
-    let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
+    --let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
+    let input = "imprimir¡5!:) hilo{ imprimir¡6!:) hilo{ imprimir¡7!:)} } esperamos:) imprimir¡8!:)"
     case parseMyLang input of
         Left err -> error (show err)
-        Right ast -> run [codeGen ast]
-
+        Right ast -> let prog = codeGen ast in run [prog,prog,prog]
+        --Right ast -> print (codeGen ast)
 
 
 -- TODO :
