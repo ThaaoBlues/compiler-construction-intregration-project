@@ -3,7 +3,8 @@ import Test.Hspec
 import Test.QuickCheck
 import Data.Either
 import MyCodeGen (codeGen)
-import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO, run)
+import Sprockell (DbgInput,localMem,sharedMem,sprStates,Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO, run, runWithDebugger, debuggerSimplePrint)
+import GHC.Conc.Sync (sharedCAF)
 -- Helper functions for type checker tests
 checkTypeValid :: [Stmt] -> Expectation
 checkTypeValid stmts = stackChecking stmts [fillSymbolTable stmts] `shouldBe` True
@@ -425,11 +426,17 @@ main = {-hspec $-} do
     let input = "imprimir¡5!:) hilo{ imprimir¡6!:) hilo{ imprimir¡7!:)} } esperamos:) imprimir¡8!:)"
     case parseMyLang input of
         Left err -> error (show err)
-        Right ast -> let prog = codeGen ast in run [prog,prog,prog]
-        --Right ast -> print (codeGen ast)
+        Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
+        -- Right ast -> print (codeGen ast)
+
+showLocalMem :: DbgInput -> String
+showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
 
 
--- TODO :
+showGlobalMem :: DbgInput -> String
+showGlobalMem ( _ , systemState ) = show $ sharedMem $ systemState
+
+-- TODO : fix join 
 --
 -- BANKING SYSTEM
 --
