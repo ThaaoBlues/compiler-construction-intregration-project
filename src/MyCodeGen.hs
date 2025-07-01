@@ -197,7 +197,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let allThreads = thisThread : nestedThreads ++ restThreads
         
     -- return updated thread table, current generated code and last address used
-    (allThreads, [EndProg]++threadBodyCode ++ restCode, finalAddr)
+    (allThreads, threadBodyCode ++ [EndProg] ++ restCode, finalAddr)
     
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter = 
     do 
@@ -244,7 +244,7 @@ generateThreadBodyWithNested gt st body nestedThreads =
                                 nestedThreads
     
     -- concat everything
-    let rest = if not (null nestedBodies) then EndProg:nestedBodies else []
+    let rest = if not (null nestedBodies) then nestedBodies ++ [EndProg] else []
     ownCode ++ rest 
 
 -- like generateThreadBodyWithNested but for normal bodies e.g if body
@@ -270,7 +270,7 @@ calculateHeaderSize :: GlobalThreadsTable -> Int
 calculateHeaderSize threads = do
     let numThreads = length threads
     let setupSize = numThreads * 2  -- 2 instructions per thread setup
-    let jumpLogicSize = 7  -- fixed size for jump logic
+    let jumpLogicSize = 6  -- fixed size for jump logic
     let branchSize = 1     -- initial branch instruction
     let joinCounter = 2
     branchSize + jumpLogicSize + setupSize + joinCounter
@@ -279,13 +279,13 @@ generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode [] = [
         -- writeInstr WILL GO THERE
           
-         Jump (Rel 7)               -- sprockell 0 jumps to skip thread repartition
+         Jump (Rel 6)               -- sprockell 0 jumps to skip thread repartition
          -- beginLoop
          , ReadInstr (IndAddr regSprID)
          , Receive regA
          , Compute Equal regA reg0 regB
          , Branch regB (Rel (-3))
-         , WriteInstr regA numberIO
+         --, WriteInstr regA numberIO
          , Jump (Ind regA)
 
         -- REST OF THE PROGRAM WILL GO THERE
@@ -529,13 +529,13 @@ r3 = regC
 
 -- in global memory
 threadJoinAddr :: MemAddr
-threadJoinAddr = 0xdead
+threadJoinAddr = 0x0002
 -- in global memory
 joinLockAddr :: MemAddr 
-joinLockAddr = 0xdeae
+joinLockAddr = 0x0003
 -- in global memory
 lockStartAddr :: MemAddr
-lockStartAddr = 0x10FF
+lockStartAddr = 0x0004
 -- in local memory
 localVarStartAddr :: MemAddr
 localVarStartAddr = 0x000a

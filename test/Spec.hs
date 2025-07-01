@@ -421,10 +421,15 @@ main = {-hspec $-} do
     -- let prog = [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
     -- Sprockell.run [prog]
     -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
-    let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
+    -- let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
+    -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
+    -- let input = "entero z:) z = 6:) entero x:) x = 0:) booleana a:) a = verdad:) durante a { booleana z:) z = verdad:) imprimir ¡z! :) booleana y:) y = x==2:) si y {entero t:) a = mentira:)} sino {x = x + 1:)} durante z {z=mentira:) imprimir ¡x!:)}}"
+    let input = "imprimir ¡0!:) hilo {imprimir ¡1!:) hilo {imprimir ¡2!:)}} imprimir¡4!:)"
     case parseMyLang input of
         Left err -> error (show err)
-        Right ast -> run [codeGen ast]
+        -- Right ast -> run [prog, prog, prog]
+        --     where prog = codeGen ast
+        Right ast -> print (codeGen ast)
 
 
 
