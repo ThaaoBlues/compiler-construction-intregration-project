@@ -345,8 +345,8 @@ generateStmtCode gt st (If cond body1 body2) =
     let st1 = fillLocalDisplayForThisBody (newBlockInStack st) body1
     let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body2
     let condCode = generateExprCode gt st cond
-    let elseBodyCode = generateNormalBody gt st1 body2
-    let ifBodyCode = generateNormalBody gt st2 body1
+    let elseBodyCode = generateNormalBody gt st2 body2
+    let ifBodyCode = generateNormalBody gt st1 body1
         -- we use NOP as a fallback for condition as we don't know anything about what's after
     condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
@@ -359,7 +359,7 @@ generateStmtCode gt st (While cond body) =
   do 
     let stw = fillLocalDisplayForThisBody (newBlockInStack st) body
     let condCode = generateExprCode gt st cond
-    let bodyCode = generateNormalBody gt st body
+    let bodyCode = generateNormalBody gt stw body
     let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
 
