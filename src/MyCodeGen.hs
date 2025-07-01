@@ -202,7 +202,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter = 
     do 
       -- TODO : Check if it is still logic to put empty thread table here
-    let stmtCode = generateStmtCode gt st [] currentAddr stmt
+    let stmtCode = generateStmtCode gt st stmt
     let stmtSize = length stmtCode
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (currentAddr + stmtSize) threadCounter
     
@@ -249,19 +249,10 @@ generateThreadBodyWithNested gt st body nestedThreads =
     ownCode ++ rest 
 
 -- Like generateThreadBodyWithNested but for normal bodies e.g if body
--- still supports nested threads
-generateNormalBodyWithNested :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> GlobalThreadsTable -> [Instruction]
-generateNormalBodyWithNested gt st body nestedThreads = do
-    -- Generate the body's own code
-    let ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
-        -- Add nested thread bodies at the end
-    let nestedBodies = concatMap (\(_, _, nestedBody) -> do
-                                    let st2 = fillLocalDisplayForThisBody [] nestedBody
-                                    generateThreadBodyWithNested gt st2 nestedBody []
-                                  )    
-                                  nestedThreads
-    
-    ownCode ++ nestedBodies
+-- Putting threads in if/else and while is not supported
+-- so we just generate the classic body
+generateNormalBody :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> [Instruction]
+generateNormalBody gt st = concatMap (generateStmtCode gt st)
 
 
 
@@ -274,7 +265,7 @@ generateStmtCodeForThread gt _ nestedThreads la (ThreadCreate body) =
 
 -- TODO : Check if it is still logic to put empty thread table here
 generateStmtCodeForThread gt st nestedThreads la stmt = 
-    generateStmtCode gt st [] la stmt
+    generateStmtCode gt st stmt
 
 
 -- Calculate header size based on number of threads
@@ -322,8 +313,8 @@ buildHeader tt = [Branch regSprID (Rel (length tt*2+2)),
 
 
 -- Generate code for a statement
-generateStmtCode :: GlobalSymbolTable->LocalVarStack->GlobalThreadsTable->Int-> Stmt -> [Instruction]
-generateStmtCode gt st _ _ (Declaration typ name) = 
+generateStmtCode :: GlobalSymbolTable->LocalVarStack-> Stmt -> [Instruction]
+generateStmtCode gt st (Declaration typ name) = 
   case typ of
     -- Variable declaration is already taken care of, 
     -- we just add initialisation to 0 for locals
@@ -331,7 +322,7 @@ generateStmtCode gt st _ _ (Declaration typ name) =
     (Global _) -> []
     _ -> [Load (ImmValue 0) r1,Store r1 (DirAddr $ getMemAddrforLocalVar st name)]
 
-generateStmtCode gt st _  _ (Assignment name expr) =
+generateStmtCode gt st (Assignment name expr) =
   do
   let exprCode = generateExprCode gt st expr
 
@@ -352,13 +343,13 @@ generateStmtCode gt st _  _ (Assignment name expr) =
   
 
 
-generateStmtCode gt st tt _ (If cond body1 body2) =
+generateStmtCode gt st (If cond body1 body2) =
   do
     let st1 = fillLocalDisplayForThisBody (newBlockInStack st) body1
     let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body2
     let condCode = generateExprCode gt st cond
-    let elseBodyCode = generateNormalBodyWithNested gt st1 body2 tt
-    let ifBodyCode = generateNormalBodyWithNested gt st2 body1 tt
+    let elseBodyCode = generateNormalBody gt st1 body2
+    let ifBodyCode = generateNormalBody gt st2 body1
         -- We use NOP as a fallback for condition as wReceive 2,Compute Eque don't know anything about what's after
     condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
@@ -367,10 +358,10 @@ generateStmtCode gt st tt _ (If cond body1 body2) =
       ++ [Nop] -- Fallback for end of condition
 
 
-generateStmtCode gt st tt _ (While cond body) =
+generateStmtCode gt st (While cond body) =
   do 
     let condCode = generateExprCode gt st cond
-    let bodyCode = generateNormalBodyWithNested gt st body tt
+    let bodyCode = generateNormalBody gt st body
     let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
 
@@ -393,29 +384,29 @@ generateStmtCode gt st tt _ (While cond body) =
 --   in exprCode ++ [WriteInstr r1 charIO]
 
 -- Print number
-generateStmtCode gt st tt _ (Print e) =
+generateStmtCode gt st (Print e) =
   let exprCode = generateExprCode gt st e
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
   in exprCode ++writeString "OUT : " ++ [Pop r1,WriteInstr r1 numberIO]
 
-generateStmtCode _ _ _ _ (ThreadJoin) = [
+generateStmtCode _ _ (ThreadJoin) = [
           TestAndSet (DirAddr joinLockAddr), 
           Receive r1,
           Branch r1 (Rel 2), -- if 1, don't loop back
           Jump (Rel (-3))
           ]
 
-generateStmtCode gt _ _ _ (LockFree lockName) =
+generateStmtCode gt _ (LockFree lockName) =
   let lockAddr = getMemAddrFromTable gt lockName
   in [WriteInstr reg0 (DirAddr lockAddr)] -- Release lock by writing 0
 
 
-generateStmtCode gt _ _ _ (LockGet lockName) =
+generateStmtCode gt _ (LockGet lockName) =
   let lockAddr = getMemAddrFromTable gt lockName
   in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] -- Acquire lock with test-and-set
 
 
-generateStmtCode gt st tt la (ScopeBlock body) = generateNormalBodyWithNested gt st body tt
+generateStmtCode gt st (ScopeBlock body) = generateNormalBody gt st body
 
 
 
@@ -555,8 +546,6 @@ codeGen ss = do
   let header = buildHeader tt
   header ++ body
 
-
-  -- TODO : REPLACE EMPTY LIST BY SYMBOL TABLE (VARIABLE ALLOCATION)
 
 -- TODO : tests 
 
