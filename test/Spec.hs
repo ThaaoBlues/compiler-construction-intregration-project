@@ -425,3 +425,47 @@ main = {-hspec $-} do
     case parseMyLang input of
         Left err -> error (show err)
         Right ast -> run [codeGen ast]
+
+
+
+-- TODO :
+--
+-- BANKING SYSTEM
+--
+-- To show the correct functioning of the concurrency feature of your language, you should provide at least
+-- the following test program:
+-- An elementary banking system, where several entities (think of shops, subscription services, etc.) per-
+-- form transactions on the same account. Your implementation should ensure that concurrent transactions do
+-- not lead to an incorrect state of the bank account. Be sure to have multiple entities (more than two) doing
+-- multiple transactions (more than two) using multiple threads (at least four).
+
+--
+-- SEMANTIC ERRORS
+--
+-- Testing for semantic errors
+-- This class of errors is about run-time behaviour. Typically, you should include programs that are supposed
+-- to run correctly and of which the expected outcome is known, as well as programs that are known to contain
+-- a run-time error. You may consider the following (types of) test cases:
+
+
+-- • Simple algorithms that calculate some value, for instance the number of days of the month February
+-- in any particular year (involving a test for leap years); whether or not a given number is prime. If you
+-- have implemented arrays, the scope for algorithms of the above kind becomes much larger.
+
+
+-- • An algorithm that you expect to run into an infinite loop. Note that this is problematic to test auto-
+-- matically, as by definition your test will not terminate if the behaviour is as expected. In JU NIT, there
+-- is a way around this: the @Test-annotation has a parameter timeout that you can set to avoid tests that
+-- do not terminate; e.g.
+-- @Test ( timeout = 1000)
+-- public void testSomething () {
+-- while (true) ;
+-- }
+-- will cause the method testSomething to terminate after 1000 milliseconds and flag an error.
+
+
+-- • Algorithms that you expect to generate a run-time error, for instance division by zero.
+-- In the test suite for this class of errors, ideally every feature of your language should occur at least once in a
+-- correctly running program (meaning that you actually test whether correct code is generated for that feature,
+-- at least in the particular context of your test). The test involves both running the compiler, including code
+-- generation, and running the generated code on the S PROCKELL virtual machine.

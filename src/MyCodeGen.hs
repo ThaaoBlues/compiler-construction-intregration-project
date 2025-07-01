@@ -302,7 +302,8 @@ generateThreadJumpCode ((id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr r
 buildHeader :: GlobalThreadsTable->[Instruction]
 -- length tt*2 corresponds to loads + write, 
 -- +2 corresponds to jump + actual target instruction
-buildHeader tt = [Branch regSprID (Rel (length tt*2+2)),
+-- +2 for join counter initialisation
+buildHeader tt = [Branch regSprID (Rel (length tt*2+2+2)),
   Load (ImmValue (length tt)) r1 , 
   WriteInstr r1 (DirAddr threadJoinAddr)]
   ++ generateThreadJumpCode tt
