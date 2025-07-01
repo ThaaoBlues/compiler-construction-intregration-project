@@ -142,7 +142,7 @@ secondPassGeneration gt st stmts =
         -- adjust thread start addresses by adding header size
         -- we could not know actual start address as we cannot generate 
         -- header before actually iterating threads and generate their bodies
-        -- to discover their sizes, 
+        -- to dis[EndProg]++cover their sizes, 
         -- as precedent thread size obviously influence following thread start address
 
     let adjustedThreads = map (\(tid, addr, body) -> (tid, addr + headerSize, body)) threads
@@ -197,7 +197,8 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let allThreads = thisThread : nestedThreads ++ restThreads
         
     -- return updated thread table, current generated code and last address used
-    (allThreads, [EndProg]++threadBodyCode ++ restCode, finalAddr)
+    if threadId > 1 then (allThreads, [EndProg]++threadBodyCode ++ restCode, finalAddr) 
+    else (allThreads, threadBodyCode ++ restCode, finalAddr)
     
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter = 
     do 
@@ -270,7 +271,7 @@ calculateHeaderSize :: GlobalThreadsTable -> Int
 calculateHeaderSize threads = do
     let numThreads = length threads
     let setupSize = numThreads * 2  -- 2 instructions per thread setup
-    let jumpLogicSize = 7  -- fixed size for jump logic
+    let jumpLogicSize = 6  -- fixed size for jump logic
     let branchSize = 1     -- initial branch instruction
     let joinCounter = 2
     branchSize + jumpLogicSize + setupSize + joinCounter
@@ -279,14 +280,14 @@ generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode [] = [
         -- writeInstr WILL GO THERE
           
-         Jump (Rel 7)               -- sprockell 0 jumps to skip thread repartition
+         Jump (Rel 6)               -- sprockell 0 jumps to skip thread repartition
          -- beginLoop
          , ReadInstr (IndAddr regSprID)
-         , Receive regA
-         , Compute Equal regA reg0 regB
-         , Branch regB (Rel (-3))
-         , WriteInstr regA numberIO
-         , Jump (Ind regA)
+         , Receive r1
+         , Compute Equal r1 reg0 r2
+         , Branch r2 (Rel (-3))
+         -- , WriteInstr regA numberIO
+         , Jump (Ind r1)
 
         -- REST OF THE PROGRAM WILL GO THERE
 
@@ -529,13 +530,13 @@ r3 = regC
 
 -- in global memory
 threadJoinAddr :: MemAddr
-threadJoinAddr = 0xdead
+threadJoinAddr = 0x0002 -- irrationnal fear of using address 1, sorry
 -- in global memory
 joinLockAddr :: MemAddr 
-joinLockAddr = 0xdeae
+joinLockAddr = 0x0003
 -- in global memory
 lockStartAddr :: MemAddr
-lockStartAddr = 0x10FF
+lockStartAddr = 0x0004
 -- in local memory
 localVarStartAddr :: MemAddr
 localVarStartAddr = 0x000a
