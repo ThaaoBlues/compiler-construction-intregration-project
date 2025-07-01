@@ -6,17 +6,17 @@ import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 import Data.Char
 import Test.QuickCheck.Text (number)
 
--- Global symbol table type
+-- global symbol table type
 type GlobalSymbolTable = [(String, MemAddr)]
 
--- Thread info: (name, threadId, startAddress, body)
+-- thread info: (name, threadId, startAddress, body)
 type ThreadInfo = (Int, Int, [Stmt])
 -- threads table
 type GlobalThreadsTable = [ThreadInfo]
 
 type LocalVarStack = [GlobalSymbolTable]
 
--- Add local variable to head of display stack
+-- add local variable to head of display stack
 getFirstAvailableLocalVarAddr :: LocalVarStack->Int
 getFirstAvailableLocalVarAddr [] = localVarStartAddr
 getFirstAvailableLocalVarAddr (x:xs) | null x = getFirstAvailableLocalVarAddr xs
@@ -36,7 +36,7 @@ getMemAddrforLocalVar (x:xs) name = case lookup name x of
 
     Nothing -> getMemAddrforLocalVar xs name
 
--- Returns nothing if variable is not found during lookup
+-- returns nothing if variable is not found during lookup
 -- usefull if we don't know wether the variable is local or global
 getMemAddrforLocalVarMaybe :: LocalVarStack->String->Maybe MemAddr
 getMemAddrforLocalVarMaybe [] _ = Nothing
@@ -45,16 +45,16 @@ getMemAddrforLocalVarMaybe (x:xs) name = case lookup name x of
     Nothing -> getMemAddrforLocalVarMaybe xs name
 
 
--- Used when encountering a new body, add a level to the display stack
+-- used when encountering a new body, add a level to the display stack
 newBlockInStack :: LocalVarStack->LocalVarStack
 newBlockInStack s = []:s
 
--- Used when encountering a getting out of a body, remove a level to the display stack
+-- used when encountering a getting out of a body, remove a level to the display stack
 popBlockFromStack :: LocalVarStack->LocalVarStack
 popBlockFromStack = tail
 
 
--- Add a global variable to the symbol table
+-- add a global variable to the symbol table
 addGlobalVariable :: String -> Type -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
 addGlobalVariable name typ table =
   let addr = case table of
@@ -64,14 +64,14 @@ addGlobalVariable name typ table =
   in (newTable, addr)
 
 
--- Get memory address for a given object
+-- get memory address for a given object
 getMemAddrFromTable :: GlobalSymbolTable->String-> MemAddr
 getMemAddrFromTable gt name =
   case lookup name gt of
     Just addr -> addr
     Nothing -> error ("Global variable not found: " ++ name)
 
--- Add a lock to the symbol table
+-- add a lock to the symbol table
 addLock :: String -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
 addLock name table =
   let addr = case table of
@@ -81,7 +81,7 @@ addLock name table =
   in (newTable, addr)
 
 
--- Allocate memory for an array
+-- allocate memory for an array
 allocateArrayMemory :: GlobalSymbolTable -> Int -> MemAddr
 allocateArrayMemory globalTable length =
   let maxAddr = case globalTable of
@@ -95,9 +95,9 @@ allocateArrayMemory globalTable length =
 
 
 
--- Two-Pass Generation :
--- First pass fills global symbol table with locks and everything
--- Second pass generates everything to get exact thread body sizes, 
+-- two-Pass Generation :
+-- first pass fills global symbol table with locks and everything
+-- second pass generates everything to get exact thread body sizes, 
 firstPassGeneration :: [Stmt] -> Int -> (GlobalSymbolTable,LocalVarStack)
 firstPassGeneration [] lc = ([],[])
 
@@ -113,11 +113,11 @@ firstPassGeneration ((Declaration typ name):xs) lc = do
     _->(gt,addLocalVariable st name)
 
 
--- Stack in if/while/thread bodies is extended and filled right before opening it
+-- stack in if/while/thread bodies is extended and filled right before opening it
 
 firstPassGeneration (_:xs) lc = firstPassGeneration xs lc
 
--- Like first pass but only for local variables,
+-- like first pass but only for local variables,
 -- to be used when dynamcally extending stack for while/if bodies
 fillLocalDisplayForThisBody :: LocalVarStack->[Stmt] -> LocalVarStack
 fillLocalDisplayForThisBody st [] = st 
@@ -131,7 +131,7 @@ fillLocalDisplayForThisBody st (x:xs) = fillLocalDisplayForThisBody st xs
 
 
 -- TODO : ADD Stack support for local variables passing in second pass
--- Second pass: generate all code to determine exact sizes with proper nested thread handling
+-- second pass: generate all code to determine exact sizes with proper nested thread handling
 secondPassGeneration :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> (GlobalThreadsTable, [Instruction], Int)
 secondPassGeneration gt st stmts = 
     do 
@@ -139,7 +139,7 @@ secondPassGeneration gt st stmts =
     let headerSize = calculateHeaderSize threads
 
 
-        -- Adjust thread start addresses by adding header size
+        -- adjust thread start addresses by adding header size
         -- we could not know actual start address as we cannot generate 
         -- header before actually iterating threads and generate their bodies
         -- to discover their sizes, 
@@ -148,10 +148,10 @@ secondPassGeneration gt st stmts =
     let adjustedThreads = map (\(tid, addr, body) -> (tid, addr + headerSize, body)) threads
     (adjustedThreads, mainBody++[EndProg], headerSize)
 
--- Collect threads and generate their bodies in first pass (with thread counter)
+-- collect threads and generate their bodies in first pass (with thread counter)
 collectAndGenerateThreads :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> Int -> Int -> (GlobalThreadsTable, [Instruction], Int)
 
--- Base case, we don't have anymore statements from which generate code
+-- base case, we don't have anymore statements from which generate code
 collectAndGenerateThreads _ _ [] la _ = ([], [], la)
 
 
@@ -173,16 +173,16 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let st2 = fillLocalDisplayForThisBody [] body 
 
     -- RECURSIVELY collect nested threads from the thread body
-    -- Don't forget to add join counter decrement mechanism size
+    -- don't forget to add join counter decrement mechanism size
     -- so the calculated parent thread body length for NESTED threads 
     -- is the right one (i.e not having only the "thread logic" length as start address offset)
     let (nestedThreads, _, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize) threadId
         
-    -- Generate the actual thread body code (including nested threads)
+    -- generate the actual thread body code (including nested threads)
     let threadBodyCode = generateThreadBodyWithNested gt st2 body nestedThreads 
 
     let threadSize = length threadBodyCode
-    -- Process remaining statements with updated thread counter
+    -- process remaining statements with updated thread counter
     let maxNestedId = if null nestedThreads 
                          then threadId 
                          else maximum (map (\(tid, _, _) -> tid) nestedThreads)
@@ -191,38 +191,37 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- same nesting level, keep former display
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + threadSize+1) maxNestedId
         
-    -- Concat this thread, all its nested threads and all the ones in following statements
+    -- concat this thread, all its nested threads and all the ones in following statements
     -- la+1 for taking account of leading EndProg
     let thisThread = (threadId, la+1, body)
     let allThreads = thisThread : nestedThreads ++ restThreads
         
-    -- Return updated thread table, current generated code and last address used
+    -- return updated thread table, current generated code and last address used
     (allThreads, [EndProg]++threadBodyCode ++ restCode, finalAddr)
     
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter = 
     do 
-      -- TODO : Check if it is still logic to put empty thread table here
     let stmtCode = generateStmtCode gt st stmt
     let stmtSize = length stmtCode
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (currentAddr + stmtSize) threadCounter
     
-    -- Return thread table generated by following statements
-    -- Current generated code and last address used
+    -- return thread table generated by following statements
+    -- current generated code and last address used
     (restThreads, stmtCode ++ restCode, finalAddr)
 
 
 
--- Generate thread body that can contain nested threads
+-- generate thread body that can contain nested threads
 generateThreadBodyWithNested :: GlobalSymbolTable->LocalVarStack-> [Stmt] -> GlobalThreadsTable -> [Instruction]
 generateThreadBodyWithNested gt st body nestedThreads = 
     do 
 
 
 
-    let -- Generate the thread's own code
+    let -- generate the thread's own code
         ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
 
-          -- Acquire join lock, decrement variable, free join lock
+          -- acquire join lock, decrement variable, free join lock
           ++ [TestAndSet (DirAddr joinLockAddr), 
               Receive r1,
               Branch r1 (Rel 2), -- if 1, don't loop back
@@ -232,7 +231,7 @@ generateThreadBodyWithNested gt st body nestedThreads =
               WriteInstr r1 (DirAddr joinLockAddr),
               WriteInstr reg0 (DirAddr joinLockAddr)
             ]
-        -- Add nested thread bodies at the end
+        -- add nested thread bodies at the end
 
     
 
@@ -244,37 +243,35 @@ generateThreadBodyWithNested gt st body nestedThreads =
                                 
                                 nestedThreads
     
-    -- Concat everything
+    -- concat everything
     let rest = if not (null nestedBodies) then EndProg:nestedBodies else []
     ownCode ++ rest 
 
--- Like generateThreadBodyWithNested but for normal bodies e.g if body
--- Putting threads in if/else and while is not supported
+-- like generateThreadBodyWithNested but for normal bodies e.g if body
+-- putting threads in if/else and while is not supported
 -- so we just generate the classic body
 generateNormalBody :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> [Instruction]
 generateNormalBody gt st = concatMap (generateStmtCode gt st)
 
 
 
--- Generate statement code within a thread context (handles nested ThreadCreate)
+-- generate statement code within a thread context (handles nested ThreadCreate)
 generateStmtCodeForThread :: GlobalSymbolTable->LocalVarStack -> GlobalThreadsTable -> Int -> Stmt -> [Instruction]
 generateStmtCodeForThread gt _ nestedThreads la (ThreadCreate body) = 
-    -- When we encounter a ThreadCreate inside a thread, it should be handled
+    -- when we encounter a ThreadCreate inside a thread, it should be handled
     -- by the nested thread system, so we don't generate code here
     []
-
--- TODO : Check if it is still logic to put empty thread table here
 generateStmtCodeForThread gt st nestedThreads la stmt = 
     generateStmtCode gt st stmt
 
 
--- Calculate header size based on number of threads
+-- calculate header size based on number of threads
 calculateHeaderSize :: GlobalThreadsTable -> Int
 calculateHeaderSize threads = do
     let numThreads = length threads
     let setupSize = numThreads * 2  -- 2 instructions per thread setup
-    let jumpLogicSize = 7  -- Fixed size for jump logic
-    let branchSize = 1     -- Initial branch instruction
+    let jumpLogicSize = 7  -- fixed size for jump logic
+    let branchSize = 1     -- initial branch instruction
     let joinCounter = 2
     branchSize + jumpLogicSize + setupSize + joinCounter
 
@@ -282,7 +279,7 @@ generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode [] = [
         -- writeInstr WILL GO THERE
           
-         Jump (Rel 7)               -- Sprockell 0 jumps to skip thread repartition
+         Jump (Rel 7)               -- sprockell 0 jumps to skip thread repartition
          -- beginLoop
          , ReadInstr (IndAddr regSprID)
          , Receive regA
@@ -300,8 +297,8 @@ generateThreadJumpCode ((id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr r
   ++ generateThreadJumpCode ts
 
 
-
--- Wrapper function to put threads
+-- put some instructions in header before building the thread dispatcher 
+-- (branch + join counter init)
 buildHeader :: GlobalThreadsTable->[Instruction]
 -- length tt*2 corresponds to loads + write, 
 -- +2 corresponds to jump + actual target instruction
@@ -312,11 +309,11 @@ buildHeader tt = [Branch regSprID (Rel (length tt*2+2)),
 
 
 
--- Generate code for a statement
+-- generate code for a statement
 generateStmtCode :: GlobalSymbolTable->LocalVarStack-> Stmt -> [Instruction]
 generateStmtCode gt st (Declaration typ name) = 
   case typ of
-    -- Variable declaration is already taken care of, 
+    -- variable declaration is already taken care of, 
     -- we just add initialisation to 0 for locals
     (Global Lock) -> [] -- locks are already taken care of
     (Global _) -> []
@@ -332,12 +329,12 @@ generateStmtCode gt st (Assignment name expr) =
 
   let result = getMemAddrforLocalVarMaybe st name
   case result of
-    -- Name refers to a global variable
+    -- name refers to a global variable
     Nothing -> do 
       let varAddr = getMemAddrFromTable gt name
       exprCode ++ [Pop r1,WriteInstr r1 (DirAddr varAddr)]
 
-    -- Local one
+    -- local one
     (Just addr)-> exprCode ++ [Pop r1,Store r1 (DirAddr addr)]
 
   
@@ -350,12 +347,12 @@ generateStmtCode gt st (If cond body1 body2) =
     let condCode = generateExprCode gt st cond
     let elseBodyCode = generateNormalBody gt st1 body2
     let ifBodyCode = generateNormalBody gt st2 body1
-        -- We use NOP as a fallback for condition as wReceive 2,Compute Eque don't know anything about what's after
+        -- we use NOP as a fallback for condition as we don't know anything about what's after
     condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
-      ++[Jump (Rel (length ifBodyCode +1))] -- Jump to NOP 
+      ++[Jump (Rel (length ifBodyCode +1))] -- jump to NOP 
       ++ ifBodyCode 
-      ++ [Nop] -- Fallback for end of condition
+      ++ [Nop] -- fallback for end of condition
 
 
 generateStmtCode gt st (While cond body) =
@@ -384,7 +381,7 @@ generateStmtCode gt st (While cond body) =
 --   let exprCode = generateExprCode globalTable e
 --   in exprCode ++ [WriteInstr r1 charIO]
 
--- Print number
+-- print number
 generateStmtCode gt st (Print e) =
   let exprCode = generateExprCode gt st e
   -- writeString do not uses stack, so Pop r1 still gives us the expression value
@@ -399,12 +396,13 @@ generateStmtCode _ _ (ThreadJoin) = [
 
 generateStmtCode gt _ (LockFree lockName) =
   let lockAddr = getMemAddrFromTable gt lockName
-  in [WriteInstr reg0 (DirAddr lockAddr)] -- Release lock by writing 0
+  in [WriteInstr reg0 (DirAddr lockAddr)] -- release lock by writing 0
 
 
 generateStmtCode gt _ (LockGet lockName) =
   let lockAddr = getMemAddrFromTable gt lockName
-  in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] -- Acquire lock with test-and-set
+  -- acquire lock with test-and-set
+  in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] 
 
 
 generateStmtCode gt st (ScopeBlock body) = generateNormalBody gt st body
@@ -414,11 +412,11 @@ generateStmtCode gt st (ScopeBlock body) = generateNormalBody gt st body
 
 
 
--- Generate code for an expression
+-- generate code for an expression
 generateExprCode :: GlobalSymbolTable->LocalVarStack-> Expr -> [Instruction]
 
 generateExprCode _ _ (IntLit n) = [Load (ImmValue (fromIntegral n)) r1, Push r1]
--- Store booleans as int in {0,1}
+-- store booleans as int in {0,1}
 generateExprCode _ _ (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1, Push r1]
 
 generateExprCode gt st (Var name) = do
@@ -426,12 +424,12 @@ generateExprCode gt st (Var name) = do
     let result = getMemAddrforLocalVarMaybe st name
     case result of
 
-      -- Name refers to a global variable
+      -- name refers to a global variable
       Nothing -> do 
         let varAddr = getMemAddrFromTable gt name
         [Receive r1,Push r1]
 
-      -- Local one
+      -- local one
       (Just addr)->[Load (DirAddr addr) r1, Push r1]
 
 
@@ -456,7 +454,7 @@ generateExprCode gt st (BinOp op e1 e2) =
     ++ e2Code
     ++ [Pop r2]  
     ++ [Pop r1]
-    -- Assume e1 is in r1, e2 in r2, result in r3
+    -- assume e1 is in r1, e2 in r2, result in r3
     ++ [Compute opCode r1 r2 r3]
     -- put result in stack
     ++ [Push r3] 
@@ -468,7 +466,7 @@ generateExprCode gt st (UnOp op e) =
   let eCode = generateExprCode gt st e
   let computeCode = 
         case op of
-          -- Booleans are ints in {0,1} so we need to make ifs
+          -- booleans are ints in {0,1} so we need to make ifs
           -- boolean negation
 
           MyParser.Not -> do
@@ -497,17 +495,18 @@ generateExprCode gt st (ArrayLit exprs) =
       arrayLength = length exprs
       arrayAddr = allocateArrayMemory gt arrayLength
 
-  -- Index of expression is also offset in array, as we assume one address point on 4 bytes ;)
+  -- index of expression is also offset in array, as we assume one address point on 4 bytes ;)
   in concatMap (\ (idx, exprCode) -> exprCode ++ [Store r1 (DirAddr (arrayAddr + idx))]) (zip [0..] exprCodes)
 
 generateExprCode gt st (ArrayAccess arrayName indexExpr) =
   let indexCode = generateExprCode gt st indexExpr
       arrayAddr = getMemAddrFromTable gt arrayName
 
-  in indexCode ++ [Load (DirAddr (arrayAddr + r1)) r1,Push r1] -- Load array element at address arrayAddr + index
+  in indexCode ++ [Load (DirAddr (arrayAddr + r1)) r1,Push r1] -- load array element at address arrayAddr + index
 
 
--- CODE FROM GITHUB EXAMPLES
+-- CODE FROM GITHUB SPROCKELL EXAMPLES
+-- see https://github.com/bobismijnnaam/sprockell/blob/master/demos/DemoCharIO.hs
 -- | Generate code to print a (Haskell) String
 writeString :: String -> [Instruction]
 writeString str = concat $ map writeChar str
@@ -520,22 +519,23 @@ writeChar c =
     ]
 -- END OF GITHUB EXAMPLE
 
--- Register and memory address management
+
+-- register and memory address management
 r1, r2, r3 :: RegAddr
 r1 = regA
 r2 = regB
 r3 = regC
 
--- In global memory
+-- in global memory
 threadJoinAddr :: MemAddr
 threadJoinAddr = 0xdead
--- In global memory
+-- in global memory
 joinLockAddr :: MemAddr 
 joinLockAddr = 0xdeae
--- In global memory
+-- in global memory
 lockStartAddr :: MemAddr
 lockStartAddr = 0x10FF
--- In local memory
+-- in local memory
 localVarStartAddr :: MemAddr
 localVarStartAddr = 0x000a
 
