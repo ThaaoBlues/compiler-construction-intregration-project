@@ -1,4 +1,4 @@
-[Branch 1 (Rel 3),
+[Branch 1 (Rel 4),
 Load (ImmValue 2) 2,
 WriteInstr 2 (DirAddr 2),
 Jump (Rel 8),

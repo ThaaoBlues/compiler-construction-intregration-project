@@ -218,12 +218,10 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
         -- as no deeper one can put it
         then if (countNestedThreads body) == 0
               then
-                joinCode++[EndProg]++nestedBodies++joinCode++[EndProg]  --generateThreadBodyWithNested gt st2 body nestedThreads 
+                joinCode++[EndProg]++nestedBodies++joinCode++[EndProg]  
               else 
                 joinCode++[EndProg]++nestedBodies
-        else nestedBodies  --generateThreadBodyWithNested gt st2 body nestedThreads 
-    -- let threadBodyCode = ownCode++[EndProg]++nestedBodies
-
+        else nestedBodies  
       
     let threadSize = length threadBodyCode
 
@@ -270,38 +268,6 @@ collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
     -- current generated code and last address used
     (restThreads, stmtCode ++ restCode, finalAddr)
 
-
-
-generateThreadBodyWithNested :: GlobalSymbolTable->LocalVarStack-> [Stmt] -> GlobalThreadsTable -> [Instruction]
-generateThreadBodyWithNested gt st body nestedThreads = 
-    do 
-    -- Generate the thread's own code by mapping over its statements.
-    -- The `generateStmtCodeForThread` correctly skips nested `ThreadCreate` statements,
-    -- as their bodies are laid out by the main `collectAndGenerateThreads` function.
-    let ownCode = concatMap (generateStmtCodeForThread gt st nestedThreads 0) body
-
-    -- at the end of its execution the thread must decrement the global join counter
-    -- so main thread can wait for every others
-    let joinCode = [ TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter
-                  , Receive r1
-                   , Branch r1 (Rel (-2))                      -- if 1, lock was taken, so spin
-                    -- if 0 , we got the lock, so proceed                   
-                   , Load (DirAddr threadJoinAddr) r1       -- load the join counter value
-                   , Compute Decr r1 r1 r1                  -- decrement it
-                   , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
-                   , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
-                   ]
-    
-
-    let nestedBodies = concatMap (\(_, _, nestedBody) -> 
-                                  do
-                                    -- push and fill a new level on local variables display stack
-                                    let st2 = fillLocalDisplayForThisBody [] nestedBody 
-                                    generateThreadBodyWithNested gt st2 nestedBody []) 
-                            
-                                nestedThreads
-
-    ownCode ++ joinCode ++ [EndProg]++nestedBodies -- don't forget to terminate thread
 
 
 generateStartSequence :: ThreadInfo->[Instruction]
@@ -365,12 +331,6 @@ generateThreadJumpCode _ = [
         -- REST OF THE PROGRAM WILL GO THERE
 
        ]
-
--- (name, threadId, startAddress, body)
---generateThreadJumpCode ((id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr (globalVarStartAddr+id))]
---  ++ generateThreadJump-- length tt*2 corresponds to loads + write, 
--- +1 corresponds to jump + actual target instruction
--- +2 for join counter initialisationCode ts
 
 
 -- put some instructions in header before building the thread dispatcher 
@@ -452,11 +412,6 @@ generateStmtCode gt st (While cond body) =
 
 
 
-
--- print array of numbers
--- generateStmtCode globalTable tt _ (Print (ArrayLit)) =
---   let exprCode = generateExprCode globalTable e
---   in exprCode ++ [WriteInstr r1 charIO]
 
 -- print number
 generateStmtCode gt st (Print e) =
