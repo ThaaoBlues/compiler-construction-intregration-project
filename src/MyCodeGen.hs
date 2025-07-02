@@ -354,7 +354,7 @@ generateThreadJumpCode _ = [
          -- offset added to not overwrite already present join lock and counter
          ,Load (ImmValue globalVarStartAddr) r1 
          ,Compute Sprockell.Add r1 regSprID r1 
-         , ReadInstr (IndAddr r1)
+         ,ReadInstr (IndAddr r1)
 
          , Receive r1
          , Compute Equal r1 reg0 r2
@@ -368,16 +368,18 @@ generateThreadJumpCode _ = [
 
 -- (name, threadId, startAddress, body)
 --generateThreadJumpCode ((id,sa,body):ts) = [Load (ImmValue sa) regC,WriteInstr regC (DirAddr (globalVarStartAddr+id))]
---  ++ generateThreadJumpCode ts
+--  ++ generateThreadJump-- length tt*2 corresponds to loads + write, 
+-- +1 corresponds to jump + actual target instruction
+-- +2 for join counter initialisationCode ts
 
 
 -- put some instructions in header before building the thread dispatcher 
 -- (branch + join counter init)
 buildHeader :: GlobalThreadsTable->[Instruction]
--- length tt*2 corresponds to loads + write, 
--- +2 corresponds to jump + actual target instruction
--- +2 for join counter initialisation
-buildHeader tt = [Branch regSprID (Rel (length tt*2+2+2)),
+-- +2 to skip join counter initialisation
+-- +1 to skip thread 0 jump instruction
+-- +1 to jump on the right address
+buildHeader tt = [Branch regSprID (Rel 4),
   Load (ImmValue (length tt)) r1 , 
   WriteInstr r1 (DirAddr threadJoinAddr)]
   ++ generateThreadJumpCode tt
