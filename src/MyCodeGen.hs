@@ -461,7 +461,7 @@ generateExprCode gt st (Var name) = do
       -- name refers to a global variable
       Nothing -> do 
         let varAddr = getMemAddrFromTable gt name
-        [Receive r1,Push r1]
+        [ReadInstr (DirAddr varAddr),Receive r1,Push r1]
 
       -- local one
       (Just addr)->[Load (DirAddr addr) r1, Push r1]
@@ -571,7 +571,7 @@ lockStartAddr :: MemAddr
 lockStartAddr = 0x0002
 
 globalVarStartAddr :: MemAddr
-globalVarStartAddr = 0x0003
+globalVarStartAddr = 0x0005
 
 -- in local memory
 localVarStartAddr :: MemAddr
