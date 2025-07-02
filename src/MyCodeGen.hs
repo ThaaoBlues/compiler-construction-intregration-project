@@ -222,15 +222,16 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                 , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
                 , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
                 ]
-    
+    let incrCounterCodeSize = 7 -- same as joinlock but different name for clarity
+
     let threadBodyCode = if threadId > 1
         -- add last join instruction sequence when we hit last nested body
         -- as no deeper one can put it
         then if (countNestedThreads body) == 0
               then
-                joinCode++[EndProg]++incrCounterCode++nestedBodies++joinCode++[EndProg]  
+                joinCode++[EndProg]++nestedBodies++joinCode++[EndProg]  
               else 
-                joinCode++[EndProg]++incrCounterCode++nestedBodies
+                joinCode++[EndProg]++nestedBodies
         else nestedBodies  
       
     let threadSize = length threadBodyCode
@@ -250,11 +251,11 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
       
 
     -- the code for the rest of the program starts after our jump and the thread's body
-    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + jumpSize+startSeqSize + threadSize+1) maxNestedId
+    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + jumpSize+startSeqSize+incrCounterCodeSize + threadSize+1) maxNestedId
     
 
     -- new thread's start address is immediately after the jump instruction
-    let thisThread = (threadId, la + jumpSize+startSeqSize+1 , body)
+    let thisThread = (threadId, la + jumpSize+incrCounterCodeSize+startSeqSize+1 , body)
 
     -- signal previous thread to start this one
     let startSequence = generateStartSequence thisThread
@@ -262,8 +263,13 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- thread table
     let allThreads = thisThread : nestedThreads ++ restThreads
         
-    -- final code layout: the main thread's jump, the thread's body, and then the rest of the main code
-    let finalCode = startSequence ++ jumpInstruction ++ threadBodyCode ++ restCode
+    -- final code layout: 
+    -- increments thread counter 
+    -- unlock child thread by writing its start address in memory
+    -- add child thread's jump over, 
+    -- add the child thread actual body
+    -- and then the rest of the parent thread's code
+    let finalCode = incrCounterCode ++ startSequence ++ jumpInstruction ++ threadBodyCode ++ restCode
         
     (allThreads, finalCode, finalAddr)
     
@@ -350,7 +356,7 @@ buildHeader :: GlobalThreadsTable->[Instruction]
 -- +1 to skip thread 0 jump instruction
 -- +1 to jump on the right address
 buildHeader tt = [Branch regSprID (Rel 4),
-  Load (ImmValue (length tt)) r1 , 
+  Load (ImmValue 0) r1 , 
   WriteInstr r1 (DirAddr threadJoinAddr)]
   ++ generateThreadJumpCode tt
 
@@ -599,6 +605,14 @@ codeGen ss = do
 -- TODO : tests, faire +1 sur le thread counter quand un thread démarre ( comme ça pas besoin de reinit ou jsp quoi)
 -- pb : race condition when nested thread +1 at start but main thread barrier wait at the same time 
 -- ( it could count the +1 or not )
+-- FIX : make the parent thread +1 the thread count 
+-- in a similar way at the same time as writing the jump value to unlock the child thread
+-- in that way, the counter never go to zero before all nested threads finish
+
+
+
+
+
 --  Branch regSprID (Rel 6) 
 -- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
 -- WrintrInstr registerNumLine (DirAddr AddrDeductibleFromThreadNumber)
