@@ -190,11 +190,13 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- (I lost my mind trying to fix a bug that was ultimately my own brain logic skill issue)
     
   
+    let startSeqSize = 2
+
     -- RECURSIVELY collect nested threads from the thread body
     -- don't forget to add join counter decrement mechanism size
     -- so the calculated parent thread body length for NESTED threads 
     -- is the right one (i.e not having only the "thread logic" length as start address offset)
-    let (nestedThreads, nestedBodies, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize) threadId
+    let (nestedThreads, nestedBodies, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize+startSeqSize) threadId
         
     -- generate the actual code for the thread's body
 
@@ -238,7 +240,6 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                          then threadId 
                          else maximum (map (\(tid, _, _) -> tid) nestedThreads)
       
-    let startSeqSize = 2
 
     -- the code for the rest of the program starts after our jump and the thread's body
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + jumpSize+startSeqSize + threadSize+1) maxNestedId

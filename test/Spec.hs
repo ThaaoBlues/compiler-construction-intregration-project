@@ -423,7 +423,7 @@ main = {-hspec $-} do
     -- Sprockell.run [prog]
     -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
     --let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
-    let input = "imprimir¡5!:) hilo{ imprimir¡6!:) hilo{imprimir¡7!:)} } imprimir¡8!:)"
+    let input = "imprimir¡5!:) hilo{ imprimir¡6!:) hilo{imprimir¡7!:)hilo{imprimir¡8!:) } } } imprimir¡9!:)"
     case parseMyLang input of
         Left err -> error (show err)
         --Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
