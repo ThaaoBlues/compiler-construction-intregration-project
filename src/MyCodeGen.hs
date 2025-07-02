@@ -607,16 +607,16 @@ r3 = regC
 
 -- in global memory
 threadJoinAddr :: MemAddr
-threadJoinAddr = 0x0002 -- irrationnal fear of using address 1, sorry
+threadJoinAddr = 0x0000
 -- in global memory
 joinLockAddr :: MemAddr 
-joinLockAddr = 0x0003
+joinLockAddr = 0x0001
 -- in global memory
 lockStartAddr :: MemAddr
-lockStartAddr = 0x0004
+lockStartAddr = 0x0002
 
 globalVarStartAddr :: MemAddr
-globalVarStartAddr = 0x0005
+globalVarStartAddr = 0x0003
 
 -- in local memory
 localVarStartAddr :: MemAddr
