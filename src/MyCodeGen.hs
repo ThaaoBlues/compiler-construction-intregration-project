@@ -212,15 +212,25 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                    , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
                    , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
                    ]
+
+    let incrCounterCode = [ TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter
+              , Receive r1
+                , Branch r1 (Rel (-2))                      -- if 1, lock was taken, so spin
+                -- if 0 , we got the lock, so proceed                   
+                , Load (DirAddr threadJoinAddr) r1       -- load the join counter value
+                , Compute Incr r1 r1 r1                  -- increment it
+                , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
+                , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
+                ]
     
     let threadBodyCode = if threadId > 1
         -- add last join instruction sequence when we hit last nested body
         -- as no deeper one can put it
         then if (countNestedThreads body) == 0
               then
-                joinCode++[EndProg]++nestedBodies++joinCode++[EndProg]  
+                joinCode++[EndProg]++incrCounterCode++nestedBodies++joinCode++[EndProg]  
               else 
-                joinCode++[EndProg]++nestedBodies
+                joinCode++[EndProg]++incrCounterCode++nestedBodies
         else nestedBodies  
       
     let threadSize = length threadBodyCode
@@ -586,8 +596,9 @@ codeGen ss = do
   header ++ body
 
 
--- TODO : tests 
-
+-- TODO : tests, faire +1 sur le thread counter quand un thread démarre ( comme ça pas besoin de reinit ou jsp quoi)
+-- pb : race condition when nested thread +1 at start but main thread barrier wait at the same time 
+-- ( it could count the +1 or not )
 --  Branch regSprID (Rel 6) 
 -- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
 -- WrintrInstr registerNumLine (DirAddr AddrDeductibleFromThreadNumber)
