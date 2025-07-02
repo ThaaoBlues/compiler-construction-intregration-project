@@ -151,24 +151,7 @@ secondPassGeneration gt st stmts =
 collectAndGenerateThreads :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> Int -> Int -> (GlobalThreadsTable, [Instruction], Int)
 
 -- Base case: no more statements to process.
-collectAndGenerateThreads _ _ [] la threadCounter = do 
-    -- at the end of its execution the thread must decrement the global join counter
-    -- so main thread can wait for every others
-    let joinCode = [ TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter
-                  , Receive r1
-                   , Branch r1 (Rel (-2))                      -- if 1, lock was taken, so spin
-                    -- if 0 , we got the lock, so proceed                   
-                   , Load (DirAddr threadJoinAddr) r1       -- load the join counter value
-                   , Compute Decr r1 r1 r1                  -- decrement it
-                   , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
-                   , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
-                   ]
-
-    -- don't add join counter decrementation to the main thread
-    if threadCounter > 0
-      then ([],[] , la)
-      else
-        ([],[],la)
+collectAndGenerateThreads _ _ [] la threadCounter = ([],[],la)
 
 collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter = 
     do 
@@ -181,7 +164,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
 
 
         
-    let joinLockMechanismSize = 7
+    let joinLockMechanismSize = 9
 
     -- /!\ Don't be fooled ! When two nested threads are created
     -- they will have THE SAME MEMORY ADDRESSES for local variables, 
@@ -191,7 +174,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     
   
     let startSeqSize = 2
-    let incrCounterCodeSize = 7 -- same as joinlock but different name for clarity
+    let incrCounterCodeSize = 9 -- same as joinlock but different name for clarity
 
     -- RECURSIVELY collect nested threads from the thread body
     -- don't forget to add join counter decrement mechanism size
@@ -204,22 +187,33 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
 
     -- at the end of its execution the thread must decrement the global join counter
     -- so main thread can wait for every others
-    let joinCode = [ TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter
-                  , Receive r1
-                   , Branch r1 (Rel (-2))                      -- if 1, lock was taken, so spin
-                    -- if 0 , we got the lock, so proceed                   
-                   , Load (DirAddr threadJoinAddr) r1       -- load the join counter value
+    let acquireJoinLockCode = [
+                  TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter                                        
+                   , Receive r1
+                   --, WriteInstr r1 numberIO
+                   , Branch r1 (Rel 2)-- if 1, lock was taken, so spin
+                   , Jump (Rel (-3))
+                  ]
+                  
+                                        
+    let joinCode = acquireJoinLockCode ++ [ 
+                    -- we got the lock, so proceed
+                    --Load (ImmValue 100) r1
+                    --, WriteInstr r1 numberIO      
+                   ReadInstr (DirAddr threadJoinAddr)     -- load the join counter value
+                   , Receive r1
+                   --, WriteInstr r1 numberIO
                    , Compute Decr r1 r1 r1                  -- decrement it
+                   --, WriteInstr r1 numberIO
                    , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
                    , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
                    ]
 
-    let incrCounterCode = [ TestAndSet (DirAddr joinLockAddr)       -- acquire lock for the join counter
-              , Receive r1
-                , Branch r1 (Rel (-2))                      -- if 1, lock was taken, so spin
-                -- if 0 , we got the lock, so proceed                   
-                , Load (DirAddr threadJoinAddr) r1       -- load the join counter value
-                , Compute Incr r1 r1 r1                  -- increment it
+    let incrCounterCode = acquireJoinLockCode++[                      
+                  ReadInstr (DirAddr threadJoinAddr)       -- load the join counter value
+                , Receive r1
+                , Compute Sprockell.Incr r1 r1 r1                  -- increment it
+                --, WriteInstr r1 numberIO
                 , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
                 , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
                 ]
@@ -252,7 +246,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                          else maximum (map (\(tid, _, _) -> tid) nestedThreads)
     
 
-    
+
     let startAddr = la + jumpSize+incrCounterCodeSize+startSeqSize+1
 
     -- the code for the rest of the program starts after our jump and the thread's body
@@ -341,7 +335,7 @@ generateThreadJumpCode _ = [
          ,ReadInstr (IndAddr r3)
 
          , Receive r1
-         , WriteInstr r1 numberIO -- here, r1 = 1. WHYYYYYYYYYYYYYYYYY
+         , WriteInstr r1 numberIO -- here, without print it does not work anymore. WHYYYYYYYYYYYYYYYYY
          , Compute Equal r1 reg0 r2
          , Branch r2 (Rel (-4))
          , Jump (Ind r1)
@@ -627,7 +621,7 @@ codeGen ss = do
 
 
 -- testAndSet atomically sets a variable to 1 if it is 0.
--- if it was already 1, we get a 1 when we call Receive 
+-- if it was already 1 
 
 
 
