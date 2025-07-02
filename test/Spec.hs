@@ -426,9 +426,9 @@ main = {-hspec $-} do
     let input = "imprimir¡5!:) hilo{ imprimir¡6!:) hilo{imprimir¡7!:) } } esperamos:) imprimir¡9!:)"
     case parseMyLang input of
         Left err -> error (show err)
-        Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
+        -- Right ast -> let prog = codeGen ast in run [prog,prog,prog] --runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
         -- run [prog,prog,prog]
-        --Right ast -> print (codeGen ast)
+        Right ast -> print (codeGen ast)
 
 showLocalMem :: DbgInput -> String
 showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState

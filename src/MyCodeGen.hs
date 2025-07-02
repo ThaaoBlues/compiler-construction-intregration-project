@@ -191,12 +191,13 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     
   
     let startSeqSize = 2
+    let incrCounterCodeSize = 7 -- same as joinlock but different name for clarity
 
     -- RECURSIVELY collect nested threads from the thread body
     -- don't forget to add join counter decrement mechanism size
     -- so the calculated parent thread body length for NESTED threads 
     -- is the right one (i.e not having only the "thread logic" length as start address offset)
-    let (nestedThreads, nestedBodies, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize+startSeqSize) threadId
+    let (nestedThreads, nestedBodies, _) = collectAndGenerateThreads gt [] body (la+1+joinLockMechanismSize+startSeqSize+incrCounterCodeSize) threadId
         
     -- generate the actual code for the thread's body
 
@@ -222,7 +223,6 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
                 , WriteInstr r1 (DirAddr threadJoinAddr) -- write the new value back
                 , WriteInstr reg0 (DirAddr joinLockAddr) -- release the lock
                 ]
-    let incrCounterCodeSize = 7 -- same as joinlock but different name for clarity
 
     let threadBodyCode = if threadId > 1
         -- add last join instruction sequence when we hit last nested body
@@ -241,24 +241,32 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- the main thread must insert a jump to skip over the thread body
     let jumpInstruction = if null rest 
                           then []
-                          else [Jump (Rel (threadSize+1))]
+                          else do 
+                            --map (\(tid,sa, body) -> (tid , sa+1 , body) ) nestedThreads
+                            [Jump (Rel (threadSize+1))]
 
-    let jumpSize = length jumpInstruction -- always 1 but we might change the jump so we never know
+    let jumpSize = length jumpInstruction
 
     let maxNestedId = if null nestedThreads 
                          then threadId 
                          else maximum (map (\(tid, _, _) -> tid) nestedThreads)
-      
+    
+
+    
+    let startAddr = la + jumpSize+incrCounterCodeSize+startSeqSize+1
 
     -- the code for the rest of the program starts after our jump and the thread's body
-    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (la + jumpSize+startSeqSize+incrCounterCodeSize + threadSize+1) maxNestedId
+    let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (startAddr+threadSize) maxNestedId
     
 
     -- new thread's start address is immediately after the jump instruction
-    let thisThread = (threadId, la + jumpSize+incrCounterCodeSize+startSeqSize+1 , body)
+    let thisThread = (threadId, la + startAddr , body)
 
     -- signal previous thread to start this one
-    let startSequence = generateStartSequence thisThread
+    let startSequence = [ 
+          Load (ImmValue startAddr) regC
+          ,WriteInstr regC (DirAddr (globalVarStartAddr+threadId))
+          ]
 
     -- thread table
     let allThreads = thisThread : nestedThreads ++ restThreads
@@ -285,12 +293,6 @@ collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
     (restThreads, stmtCode ++ restCode, finalAddr)
 
 
-
-generateStartSequence :: ThreadInfo->[Instruction]
-generateStartSequence (tid,sa,body) = [ 
-  Load (ImmValue sa) regC
-  ,WriteInstr regC (DirAddr (globalVarStartAddr+tid))
-  ]
 
 -- like generateThreadBodyWithNested but for normal bodies e.g if body
 -- putting threads in if/else and while is not supported
@@ -321,7 +323,7 @@ calculateHeaderSize :: Int
 calculateHeaderSize = do
     -- let numThreads = length threads
     --let setupSize = numThreads * 2  -- 2 instructions per thread setup
-    let jumpLogicSize = 8  -- fixed size for jump logic
+    let jumpLogicSize = 9  -- fixed size for jump logic
     let branchSize = 1     -- initial branch instruction
     let joinCounter = 2
     branchSize + jumpLogicSize + joinCounter
@@ -330,18 +332,18 @@ generateThreadJumpCode :: GlobalThreadsTable->[Instruction]
 generateThreadJumpCode _ = [
         -- writeInstr WILL GO THERE
           
-         Jump (Rel 8)               -- sprockell 0 jumps to skip thread repartition
+         Jump (Rel 9)               -- sprockell 0 jumps to skip thread repartition
          -- beginLoop
          -- store jump addr in shared memory findable by the target thread
          -- offset added to not overwrite already present join lock and counter
          ,Load (ImmValue globalVarStartAddr) r1 
-         ,Compute Sprockell.Add r1 regSprID r1 
-         ,ReadInstr (IndAddr r1)
+         ,Compute Sprockell.Add r1 regSprID r3
+         ,ReadInstr (IndAddr r3)
 
          , Receive r1
+         , WriteInstr r1 numberIO -- here, r1 = 1. WHYYYYYYYYYYYYYYYYY
          , Compute Equal r1 reg0 r2
-         , Branch r2 (Rel (-3))
-         -- , WriteInstr regA numberIO
+         , Branch r2 (Rel (-4))
          , Jump (Ind r1)
 
         -- REST OF THE PROGRAM WILL GO THERE
