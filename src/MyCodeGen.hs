@@ -207,22 +207,6 @@ collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (currentAddr + stmtSize) threadCounter
     (restThreads, stmtCode ++ restCode, finalAddr)
 
--- like generateThreadBodyWithNested but for normal bodies, e.g If body
--- putting threads in if/else and while is not supported
--- so we just generate the classic body
-generateNormalBody :: GlobalSymbolTable->LocalVarStack -> [Stmt] -> [Instruction]
-generateNormalBody gt st = concatMap (generateStmtCode gt st)
-
-
-
--- generate statement code within a thread context (handles nested ThreadCreate)
-generateStmtCodeForThread :: GlobalSymbolTable->LocalVarStack -> GlobalThreadsTable -> Int -> Stmt -> [Instruction]
-generateStmtCodeForThread gt _ nestedThreads la (ThreadCreate body) = 
-    -- when we encounter a ThreadCreate inside a thread, it should be handled
-    -- by the nested thread system, so we don't generate code here
-    []
-generateStmtCodeForThread gt st nestedThreads la stmt = 
-    generateStmtCode gt st stmt
 
 
 -- calculate header size based on number of threads
@@ -299,8 +283,8 @@ generateStmtCode gt st (If cond body1 body2) =
     let st1 = fillLocalDisplayForThisBody (newBlockInStack st) body1
     let st2 = fillLocalDisplayForThisBody (newBlockInStack st) body2
     let condCode = generateExprCode gt st cond
-    let elseBodyCode = generateNormalBody gt st2 body2
-    let ifBodyCode = generateNormalBody gt st1 body1
+    let elseBodyCode = concatMap (generateStmtCode gt st2) body2
+    let ifBodyCode = concatMap (generateStmtCode gt st1) body1
         -- we use NOP as a fallback for condition as we don't know anything about what's after
     condCode ++ [Pop r1] ++ [Branch r1 (Rel (length elseBodyCode + 2))] -- Jump to If 
       ++ elseBodyCode
@@ -313,7 +297,7 @@ generateStmtCode gt st (While cond body) =
   do 
     let stw = fillLocalDisplayForThisBody (newBlockInStack st) body
     let condCode = generateExprCode gt st cond
-    let bodyCode = generateNormalBody gt stw body
+    let bodyCode = concatMap (generateStmtCode gt stw) body
     let loopStart = length bodyCode + length condCode + 4
     let loopEnd = length bodyCode + length condCode + 3
 
@@ -358,7 +342,7 @@ generateStmtCode gt _ (LockGet lockName) =
 -- lock creation already taken care of in first pass
 generateStmtCode _ _ (LockCreate _) = []
 
-generateStmtCode gt st (ScopeBlock body) = generateNormalBody gt st body
+generateStmtCode gt st (ScopeBlock body) = concatMap (generateStmtCode gt st) body
 
 
 
