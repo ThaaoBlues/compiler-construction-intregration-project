@@ -1,7 +1,7 @@
 module MyCodeGen
     ( codeGen ) where
 
-import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO)
+import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO, regE, regF)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
 import Data.Char
 import Test.QuickCheck.Text (number)
@@ -255,11 +255,12 @@ generateThreadJumpCode = [
          ,Compute Sprockell.Add r1 regSprID r3
          ,ReadInstr (IndAddr r3)
 
-         , Receive r1
-         , WriteInstr r1 numberIO -- here, without print it does not work anymore. WHYYYYYYYYYYYYYYYYY
-         , Compute Equal r1 reg0 r2
-         , Branch r2 (Rel (-4))
-         , Jump (Ind r1)
+         , Receive regE
+          -- here, without print it does not work anymore. WHYYYYYYYYYYYYYYYYY
+         , Compute Equal regE reg0 regF
+         , WriteInstr regE numberIO
+         , Branch regF (Rel (-4))
+         , Jump (Ind regE)
 
         -- REST OF THE PROGRAM WILL GO THERE
 
@@ -272,7 +273,7 @@ buildHeader :: GlobalThreadsTable->[Instruction]
 -- +2 to skip join counter initialisation
 -- +1 to skip thread 0 jump instruction
 -- +1 to jump on the right address
-buildHeader tt = Branch regSprID (Rel 4):generateThreadJumpCode
+buildHeader tt = Branch regSprID (Rel 2):generateThreadJumpCode
 
 
 
@@ -501,7 +502,7 @@ lockStartAddr :: MemAddr
 lockStartAddr = 0x0002
 
 globalVarStartAddr :: MemAddr
-globalVarStartAddr = 0x0005
+globalVarStartAddr = 0x0004
 
 -- in local memory
 localVarStartAddr :: MemAddr
