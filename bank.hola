@@ -1,0 +1,62 @@
+global entero account_balance:)
+esclusa account_lock:)
+
+// set a default balance before starting threads
+account_balance = 100:)
+
+// first shop
+hilo {
+    booleana pay:)
+    pay = verdad:)
+    durante verdad{
+        //imprimir¡9999!:)
+        obtener account_lock:)
+        //imprimir¡8888!:)
+        si pay {
+            account_balance = account_balance + 10:)
+        }sino{
+            account_balance = account_balance - 10:)
+        }
+        pay = ~:( pay :)
+
+        liberar account_lock:)
+    }
+
+}
+
+// second shop
+hilo {
+    booleana pay:)
+    pay = mentira:)
+    durante verdad{
+        //imprimir¡9999!:)
+        obtener account_lock:)
+        //imprimir¡8888!:)
+        si pay {
+            account_balance = account_balance + 2:)
+        }sino{
+            account_balance = account_balance - 2:)
+        }
+        pay = ~:( pay :)
+
+        liberar account_lock:)
+    }
+}
+
+// account balance change detection
+hilo {
+    entero old_balance:)
+    old_balance=0:)
+
+    durante verdad {
+        obtener account_lock:)
+            si account_balance != old_balance {
+                imprimir¡account_balance!:)
+            } sino {
+
+            }
+        liberar account_lock:)
+    }
+
+
+}

@@ -30,7 +30,7 @@ addLocalVariable st@(x:xs) name = ((name,availableAddr):x):xs
 
 -- lookup display stack
 getMemAddrforLocalVar :: LocalVarStack->String-> MemAddr
-getMemAddrforLocalVar [] _ = error "Type checking missed a non defined variable reference ?? (never going to happen)"
+getMemAddrforLocalVar [] s = error ("Type checking missed a non defined variable reference ?? (never going to happen)" ++ s)
 getMemAddrforLocalVar (x:xs) name = case lookup name x of
     Just addr -> addr
 
@@ -157,6 +157,7 @@ collectAndGenerateThreads _ _ [] la threadCounter = ([],[],la)
 -- Case for ThreadCreate: this is where the complex logic lies.
 collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     do
+
     let threadId = threadCounter + 1
 
     -- Define the standard instruction sequences for thread management.
@@ -168,7 +169,8 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     -- STEP 1: Recursively generate the code for the new thread's body.
     -- The '2' is the fixed size of startSequence.
     -- the '1' is the fixed size of jumpInstruction
-    let (nestedThreads, bodyStmtsCode, _) = collectAndGenerateThreads gt [] body (la+length incrCounterCode+2+1) threadId
+    let st2 = fillLocalDisplayForThisBody  [] body
+    let (nestedThreads, bodyStmtsCode, _) = collectAndGenerateThreads gt st2 body (la+length incrCounterCode+2+1) threadId
 
     -- STEP 2: Assemble the full, final code for the new thread, including the join/end logic.
     let fullThreadBodyCode = bodyStmtsCode ++ joinCode ++ [EndProg]
@@ -238,7 +240,7 @@ calculateHeaderSize :: Int
 calculateHeaderSize = do
     -- let numThreads = length threads
     --let setupSize = numThreads * 2  -- 2 instructions per thread setup
-    let jumpLogicSize = 9  -- fixed size for jump logic
+    let jumpLogicSize = 8  -- fixed size for jump logic
     let branchSize = 1     -- initial branch instruction
     let joinCounter = 0
     branchSize + jumpLogicSize + joinCounter
@@ -247,7 +249,7 @@ generateThreadJumpCode :: [Instruction]
 generateThreadJumpCode = [
         -- writeInstr WILL GO THERE
           
-         Jump (Rel 9)               -- sprockell 0 jumps to skip thread repartition
+         Jump (Rel 8)               -- sprockell 0 jumps to skip thread repartition
          -- beginLoop
          -- store jump addr in shared memory findable by the target thread
          -- offset added to not overwrite already present join lock and counter
@@ -258,7 +260,7 @@ generateThreadJumpCode = [
          , Receive regE
           -- here, without print it does not work anymore. WHYYYYYYYYYYYYYYYYY
          , Compute Equal regE reg0 regF
-         , WriteInstr regE numberIO
+         --, WriteInstr regE numberIO
          , Branch regF (Rel (-4))
          , Jump (Ind regE)
 
@@ -369,10 +371,10 @@ generateStmtCode gt _ (LockGet lockName) =
   -- acquire lock with test-and-set
   in [TestAndSet (DirAddr lockAddr), Receive r1,Branch r1 (Rel 2),Jump (Rel (-3))] 
 
+-- lock creation already taken care of in first pass
+generateStmtCode _ _ (LockCreate _) = []
 
 generateStmtCode gt st (ScopeBlock body) = generateNormalBody gt st body
-
-
 
 
 
@@ -383,6 +385,7 @@ generateExprCode :: GlobalSymbolTable->LocalVarStack-> Expr -> [Instruction]
 generateExprCode _ _ (IntLit n) = [Load (ImmValue (fromIntegral n)) r1, Push r1]
 -- store booleans as int in {0,1}
 generateExprCode _ _ (BoolLit b) = [Load (ImmValue (if b then 1 else 0)) r1, Push r1]
+
 
 generateExprCode gt st (Var name) = do
 

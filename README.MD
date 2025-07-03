@@ -17,20 +17,20 @@
 - or (bool) "O"
 - negations (bool) "~:("
 - parenthesis "¡expression!"
-- declaration (entero)(booleana)(array) "type variable_name:)"
+- declaration (entero)(booleana) "<type> variable_name:)"
 - default values entero:0,booleana:false,array:[]
 - scopes "iniciamos" "cerramos" or "{}" but it is boring
 - if "si cond body \n sino body"
 - assignments "variable_name = value:)"
 - array accesses "arr[entero]:)"
-- array declaration "array type name = [v1,v2,v3]:)"
+- array declaration "array <type> name = [v1,v2,v3]:)"
 - while "durante"
 - expressions right after "durante" and "si" must be evaluated as boolean during type checking
 - print "imprimir¡value!:)"
 - create thread "hilo { }:)"
 - start thread (thread creation also automatically starts it)
 - join thread "esperamos:)"
-- global thread variable "global variable_name"
+- global thread variable "global <type> variable_name"
 - create lock "esclusa lock_name:)" 
 Locks creation must be used at the beginning of the main thread only
 - free lock "liberar lock_name:)"
