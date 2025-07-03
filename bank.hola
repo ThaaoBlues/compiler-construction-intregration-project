@@ -9,7 +9,7 @@ hilo {
     booleana pay:)
     pay = verdad:)
     durante verdad{
-        //imprimir¡9999!:)
+        imprimir¡9999!:) // do not remove this print, it somehow is preventing lock starvation
         obtener account_lock:)
         //imprimir¡8888!:)
         si pay {
@@ -29,9 +29,7 @@ hilo {
     booleana pay:)
     pay = mentira:)
     durante verdad{
-        //imprimir¡9999!:)
         obtener account_lock:)
-        //imprimir¡8888!:)
         si pay {
             account_balance = account_balance + 2:)
         }sino{
