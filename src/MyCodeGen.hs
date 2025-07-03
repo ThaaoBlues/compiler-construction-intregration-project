@@ -163,26 +163,31 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let acquireLock = [ TestAndSet (DirAddr joinLockAddr), Receive r1, Branch r1 (Rel 2), Jump (Rel (-3)) ]
     let incrCounterCode = acquireLock ++ [ ReadInstr (DirAddr threadJoinAddr), Receive r1, Compute Incr r1 r1 r1, WriteInstr r1 (DirAddr threadJoinAddr), WriteInstr reg0 (DirAddr joinLockAddr) ]
     let joinCode = acquireLock ++ [ ReadInstr (DirAddr threadJoinAddr), Receive r1, Compute Decr r1 r1 r1, WriteInstr r1 (DirAddr threadJoinAddr), WriteInstr reg0 (DirAddr joinLockAddr) ]
-    
+
+
     -- STEP 1: Recursively generate the code for the new thread's body.
-    -- We pass a starting address of 0 because we are generating the code for the thread in isolation first.
-    let (nestedThreads, bodyStmtsCode, _) = collectAndGenerateThreads gt [] body 0 threadId
+    -- The '2' is the fixed size of startSequence.
+    -- the '1' is the fixed size of jumpInstruction
+    let (nestedThreads, bodyStmtsCode, _) = collectAndGenerateThreads gt [] body (la+length incrCounterCode+2+1) threadId
 
     -- STEP 2: Assemble the full, final code for the new thread, including the join/end logic.
     let fullThreadBodyCode = bodyStmtsCode ++ joinCode ++ [EndProg]
     let threadSize = length fullThreadBodyCode
 
-    -- STEP 3: Calculate the absolute start address of this new thread in the final program.
-    -- It's the parent's current address (`la`) plus the code the parent emits *before* the thread body.
-    let parentCodeSize = (length incrCounterCode) + 2 + 1 -- (incr code) + (start sequence) + (jump)
-    let startAddr = la + parentCodeSize - threadSize -- A bit of a trick: startAddr is at the end of parent code
+    -- STEP 3: Calculate the layout and start address for the new thread.
+    -- The parent thread will emit: [incrCounterCode, startSequence, jumpInstruction] before the child's code.
+    let jumpInstruction = [Jump (Rel (threadSize + 1))]
+
+    -- The start address is the parent's current address (`la`) plus the size of the code the parent emits before the child's body.
+    -- The '2' is the fixed size of startSequence.
+    let startAddr = la + (length incrCounterCode) + 2 + (length jumpInstruction)
+
 
     let thisThread = (threadId, startAddr, body)
     let startSequence = [
           Load (ImmValue startAddr) regC,
           WriteInstr regC (DirAddr (globalVarStartAddr + threadId))
-          ]
-    let jumpInstruction = [Jump (Rel (threadSize + 1))]
+         ]
 
     -- STEP 4: Process the rest of the parent's statements (i.e., sibling threads).
     -- The next available address is after all the code for the current thread creation.
@@ -194,7 +199,7 @@ collectAndGenerateThreads gt st (ThreadCreate body : rest) la threadCounter =
     let allThreads = thisThread : nestedThreads ++ restThreads
     let finalCode = incrCounterCode ++ startSequence ++ jumpInstruction ++ fullThreadBodyCode ++ restCode
 
-    (allThreads,finalCode,nextAddrForRest)
+    (allThreads, finalCode, finalAddr)
 
 -- Case for other statements (Print, Assignment, If, etc.)
 collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
@@ -203,7 +208,7 @@ collectAndGenerateThreads gt st (stmt : rest) currentAddr threadCounter =
     let stmtSize = length stmtCode
     let (restThreads, restCode, finalAddr) = collectAndGenerateThreads gt st rest (currentAddr + stmtSize) threadCounter
     (restThreads, stmtCode ++ restCode, finalAddr)
-    
+
 -- like generateThreadBodyWithNested but for normal bodies e.g if body
 -- putting threads in if/else and while is not supported
 -- so we just generate the classic body
