@@ -49,10 +49,6 @@ getMemAddrforLocalVarMaybe (x:xs) name = case lookup name x of
 newBlockInStack :: LocalVarStack->LocalVarStack
 newBlockInStack s = []:s
 
--- used when encountering a getting out of a body, remove a level to the display stack
-popBlockFromStack :: LocalVarStack->LocalVarStack
-popBlockFromStack = tail
-
 
 -- add a global variable to the symbol table
 addGlobalVariable :: String -> Type -> GlobalSymbolTable -> (GlobalSymbolTable, MemAddr)
@@ -90,6 +86,13 @@ allocateArrayMemory globalTable length =
   in maxAddr
 
 
+
+-- used to count threads to generate the right amount of program copies
+-- in the list passed to the Sprockell.run function
+countThreads :: [Stmt]->Int
+countThreads [] = 0
+countThreads ((ThreadCreate _):is) = 1+countThreads is
+countThreads (_:is) = countThreads is
 
 
 
@@ -488,33 +491,7 @@ codeGen ss = do
   header ++ body
 
 
--- TODO : tests, faire +1 sur le thread counter quand un thread démarre ( comme ça pas besoin de reinit ou jsp quoi)
--- pb : race condition when nested thread +1 at start but main thread barrier wait at the same time 
--- ( it could count the +1 or not )
--- FIX : make the parent thread +1 the thread count 
--- in a similar way at the same time as writing the jump value to unlock the child thread
--- in that way, the counter never go to zero before all nested threads finish
-
-
-
-
-
---  Branch regSprID (Rel 6) 
--- tout en haut pour éviter la partie où le thread 0 initialise les writeInstr
--- WrintrInstr registerNumLine (DirAddr AddrDeductibleFromThreadNumber)
--- the write Instr will put a value in shared memory ( the line where to jump)
--- then, for all threads except thread 0 (=> t0 jumps over that part),
--- we send a request to read that value with ReadInstr (Inaddr ..) 
--- then we wait the answer with Recieve regX
--- finally, we jump to the address in regX :)
- 
-
+-- TODO : tests
 
 -- testAndSet atomically sets a variable to 1 if it is 0.
 -- if it was already 1 
-
-
-
--- move wrinting specific start addresses before thread declaration
--- 
--- reset join counter before every thread region

@@ -1,5 +1,5 @@
 module MyParser
-    ( parseMyLang, stackChecking,fillSymbolTable, Type(..), Stmt(..), Expr(..),Op(..)
+    ( parseMyLang, stackChecking,fillSymbolTable,fillGlobalSymbolTable, Type(..), Stmt(..), Expr(..),Op(..)
     ) where
 
 import Text.Parsec
@@ -309,53 +309,106 @@ type SymbolTable = [(String,Type)]
 type STStack = [SymbolTable] -- to support scopes
 
 
--- manage symbol table stack and perform type checking at the same type
-stackChecking:: [Stmt]->STStack->Bool
--- (:) operator appends at front of the array, 
--- exatcly what we want as we are going recursively deeper
-stackChecking [] _ = True
-stackChecking s@(x:xs) stack =
-  -- create contextual stack
-  let st = fillSymbolTable s:stack 
+
+stackChecking :: [Stmt] -> SymbolTable->STStack -> [String]
+stackChecking [] _ _ = []
+stackChecking (x:xs) gt stack =
+  let st = fillSymbolTable (x:xs) : stack
   in case x of
 
-    -- the condition in a if must be a boolean
-    (If e body1 body2) -> stackChecking body1 st && stackChecking body2 st && inferType e st == Booleana
+    If e body1 body2 ->
+      let errsCond = case inferType e gt st of
+                        Booleana -> []
+                        CompilationError msg -> [msg]
+                        t -> ["If condition expected Booleana but got " ++ show t]
+          errsBody1 = stackChecking body1 gt st
+          errsBody2 = stackChecking body2 gt st
+      in errsCond ++ errsBody1 ++ errsBody2 ++ stackChecking xs gt stack
 
-    -- the condition in a while must be a boolean
-    (While e body) -> stackChecking body st && inferType e st == Booleana
+    While e body ->
+      let errsCond = case inferType e gt st of
+                        Booleana -> []
+                        CompilationError msg -> [msg]
+                        t -> ["While condition expected Booleana but got " ++ show t]
+          errsBody = stackChecking body gt st
+      in errsCond ++ errsBody ++ stackChecking xs gt stack
 
-    -- assigned variable must be from the same type as the assigning expression
-    (Assignment id e) -> inferType e st == 
-      -- handling variable out of scope error
-      case lookupStack st id of
-        (Left s) -> CompilationError s
-        (Right t) -> t
+    Assignment id e ->
+        let exprType = inferType e gt st
+                        
 
-    -- check if locks objects exists
-    (LockGet id) -> case lookupStack st id of
-      (Left s) -> False
-      (Right t) -> True
-    
-    (LockFree id) -> case lookupStack st id of
-      (Left s) -> False
-      (Right t) -> True
+            errType = case exprType of
+                        (CompilationError s ) -> [s]
+                        _ -> []
+            
+            varType = case lookupStack st id of
+              (Left s) -> case lookupTable gt id of
+                            (Left s)-> CompilationError s
+                            (Right t) -> t
+              (Right t) -> t
 
-    -- go recursively deeper in the nested scope
-    (ThreadCreate body) -> stackChecking body st
-    (ScopeBlock body) -> stackChecking body st
-  
-    _ -> True -- other statements that we do not need to check
-    -- print takes also an expression but we print every types
 
-    && stackChecking xs stack
+            errVarLookup = case varType of
+                        (CompilationError s ) -> [s]
+                        _ -> []
+            
+
+            errAssign = case varType of
+                  (CompilationError s) -> []
+                  t1 -> case exprType of
+                    (CompilationError s) -> []
+                    t2 -> if t1 /= t2 
+                            then ["Type mismatch in assignment to " ++ id ++
+                                            ": variable is " ++ show t1 ++
+                                            " but expression is " ++ show t2]
+                            else []
+                            
+        in errAssign++ errType++errVarLookup ++ stackChecking xs gt stack
+
+    LockGet id ->
+      let errs = case lookupStack st id of
+                   (Left s )-> case lookupTable gt id of
+                                (Left s) -> [s]
+                                (Right _) -> []
+                   (Right _)  -> []
+      in errs ++ stackChecking xs gt stack
+
+    LockFree id ->
+      let errs = case lookupStack st id of
+                   (Left s) -> case lookupTable gt id of
+                                  (Left s)-> [s]
+                                  (Right _)->[]
+                   (Right _)  -> []
+      in errs ++ stackChecking xs gt stack
+
+    ThreadCreate body ->
+      -- new scope, no outer variables
+      let newStack = [fillSymbolTable body]
+      in stackChecking body gt newStack ++ stackChecking xs gt stack
+
+    ScopeBlock body ->
+      -- keep outer stack + new scope on top
+      let newStack = fillSymbolTable body : stack
+      in stackChecking body gt newStack ++ stackChecking xs gt stack
+
+    _ -> stackChecking xs gt stack
+
 
 -- actually takes care of filling a symbol table on a specific depth
 fillSymbolTable::[Stmt]->SymbolTable
 fillSymbolTable [] = []
+-- skip global variables here, as we only fill local ones
+fillSymbolTable ((Declaration (Global _) _):xs) = fillSymbolTable xs
+
 fillSymbolTable ((Declaration t id):xs) = (id,t) : fillSymbolTable xs 
-fillSymbolTable ((LockCreate id):xs) = (id,Lock) : fillSymbolTable xs
 fillSymbolTable (_:xs) = fillSymbolTable xs
+
+-- same but for global variables
+fillGlobalSymbolTable::[Stmt]->SymbolTable
+fillGlobalSymbolTable [] = []
+fillGlobalSymbolTable ((Declaration (Global t) id):xs) = (id,t) : fillSymbolTable xs 
+fillGlobalSymbolTable ((LockCreate id):xs) = (id,Lock) : fillGlobalSymbolTable xs
+fillGlobalSymbolTable (_:xs) = fillGlobalSymbolTable xs
 
 
 -- data Expr = IntLit Integer
@@ -367,20 +420,21 @@ fillSymbolTable (_:xs) = fillSymbolTable xs
 --           | Paren Expr
 
 lookupStack::STStack->String->Either String Type
-lookupStack [] _ = Left "Variable out of scope"
+lookupStack [] id = Left ("Variable "++id++" out of scope")
 lookupStack (t:ts) id = case lookupTable t id of
                           (Left s) -> lookupStack ts id
                           (Right t) -> Right t
 
 lookupTable::SymbolTable->String->Either String Type
-lookupTable [] tid = Left "Variable out of scope"
+lookupTable [] tid = Left ("Variable "++tid++" out of scope")
 lookupTable [(id,vartype)] tid 
   | id == tid = Right vartype
-  | otherwise = Left "Variable out of scope"
+  | otherwise = Left ("Variable "++tid++"of wrong type or out of scope")
 
 lookupTable ((id,vartype):xs) tid 
   | id == tid = Right vartype
   | otherwise = lookupTable xs tid
+
 
 -- data Op = Mul 
 --     | Add 
@@ -399,77 +453,108 @@ lookupTable ((id,vartype):xs) tid
 allTypesEq::[Type]->Bool
 allTypesEq (x:xs) = null (filter (\t-> t /= x) xs)
 
-inferType:: Expr->STStack->Type
-inferType (IntLit _) st = Entero
-inferType (BoolLit _) st = Booleana
-inferType (ArrayLit xs) st 
-  | allTypesEq (map (flip inferType st) xs) = Array $ inferType (head xs) st
+inferType:: Expr->SymbolTable->STStack->Type
+
+inferType (IntLit _) _ st = Entero
+inferType (BoolLit _) _ st = Booleana
+inferType (ArrayLit xs) gt st 
+  | allTypesEq (map (\ss-> inferType ss gt st) xs) = Array $ inferType (head xs) gt st
   | otherwise = CompilationError "Cannot create an array of non-homogeneous types"
-inferType (Var id) st = case lookupStack st id of
-  (Left s) -> CompilationError s
+
+-- infer type by looking up local scope first
+inferType (Var id) gt st = case lookupStack st id of
+  (Left s) -> case lookupTable gt id of 
+                (Left s) -> CompilationError s
+                (Right t) -> t
   (Right t) -> t
+
 -- allows only integer multiplication
-inferType (BinOp (Mul) e1 e2) st
+inferType (BinOp (Mul) e1 e2) gt st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = CompilationError "Cannot multiply two types other than Entero"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot multiply two types other than Entero : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (BinOp (Add) e1 e2) st
+inferType (BinOp (Add) e1 e2) gt st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = CompilationError "Cannot add two types other than Entero"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot add two types other than Entero : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (BinOp (Sub) e1 e2) st
+inferType (BinOp (Sub) e1 e2) gt st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = CompilationError "Cannot subtract two types other than Entero"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot subtract two types other than Entero : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (UnOp (Inv) e1) st
+inferType (UnOp (Inv) e1) gt st
   | t1 == Entero = Entero
-  | otherwise = CompilationError "Cannot Invert types other than Entero"
-  where t1 = inferType e1 st
+  | otherwise = CompilationError $ "Cannot Invert types other than Entero : " ++ (show t1)
+  where t1 = inferType e1 gt st
 
-inferType (UnOp (Not) e1) st
+inferType (UnOp (Not) e1) gt st
   | t1 == Booleana = Booleana
-  | otherwise = CompilationError "Cannot negate two types other than Booleana"
-  where t1 = inferType e1 st
+  | otherwise = CompilationError $ "Cannot negate types other than Booleana : " ++ (show t1)
+  where t1 = inferType e1 gt st
 
 
-inferType (BinOp (Or) e1 e2) st
+inferType (BinOp (Or) e1 e2) gt st
   | t1 == Booleana && t2 == Booleana = Booleana
-  | otherwise = CompilationError "Cannot OR two types other than Booleana"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot OR two types other than Booleana : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (BinOp (And) e1 e2) st
+inferType (BinOp (And) e1 e2) gt st
   | t1 == Booleana && t2 == Booleana = Booleana
-  | otherwise = CompilationError "Cannot AND two types other than Booleana"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot AND two types other than Booleana : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (BinOp (Eq) e1 e2) st
+inferType (BinOp (Eq) e1 e2) gt st
   | t1 == t2 = Booleana
-  | otherwise = CompilationError "Cannot equate two differents types"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (BinOp (Neq) e1 e2) st
+inferType (BinOp (Geq) e1 e2) gt st
   | t1 == t2 = Booleana
-  | otherwise = CompilationError "Cannot equate two differents types"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
+  
+inferType (BinOp (Leq) e1 e2) gt st
+  | t1 == t2 = Booleana
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
+
+inferType (BinOp (Gt) e1 e2) gt st
+  | t1 == t2 = Booleana
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
+
+inferType (BinOp (Lt) e1 e2) gt st
+  | t1 == t2 = Booleana
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
+
+
+inferType (BinOp (Neq) e1 e2) gt st
+  | t1 == t2 = Booleana
+  | otherwise = CompilationError $ "Cannot equate two differents types : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
 -- the rest of operators are quantity comparators
-inferType (BinOp (_) e1 e2) st
+inferType (BinOp (_) e1 e2) gt st
   | t1 == Entero && t2 == Entero = Entero
-  | otherwise = CompilationError "Cannot compare two types other than Entero"
-  where t1 = inferType e1 st
-        t2 = inferType e2 st
+  | otherwise = CompilationError $ "Cannot compare two types other than Entero : " ++ (show t1) ++" and "++(show t2)
+  where t1 = inferType e1 gt st
+        t2 = inferType e2 gt st
 
-inferType (ArrayAccess id e) st | (t1 == Entero) && 
+inferType (ArrayAccess id e) gt st | (t1 == Entero) && 
       case lookupStack st id of
         (Left _) -> False
         (Right _) -> True
@@ -479,7 +564,7 @@ inferType (ArrayAccess id e) st | (t1 == Entero) &&
           (Right a) -> a
       | otherwise = CompilationError ("Invalid access to array "++id)
 
-      where t1 = inferType e st
+      where t1 = inferType e gt st
 
 -- parenthesised expression
-inferType (Paren e) st = inferType e st
+inferType (Paren e) gt st = inferType e gt st
