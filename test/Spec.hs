@@ -13,7 +13,7 @@ checkTypeValid stmts = stackChecking stmts (MyParser.fillGlobalSymbolTable stmts
 checkTypeInvalid :: [Stmt] -> Expectation
 checkTypeInvalid stmts = stackChecking stmts (MyParser.fillGlobalSymbolTable stmts) [fillSymbolTable stmts] `shouldNotBe` []
 
--- Tests for the parser
+-- tests for the parser
 parserSpec :: Spec
 parserSpec = describe "Parser" $ do
     it "parses a valid integer declaration" $ do
@@ -21,11 +21,11 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Declaration Entero "x"]
 
     it "rejects an invalid integer declaration" $ do
-        let input = "entero x"  -- Missing ":)"
+        let input = "entero x"  -- missing ":)"
         parseMyLang input `shouldSatisfy` isLeft
 
     it "rejects an invalid integer declaration" $ do
-        let input = "enterox:)"  -- Missing " "
+        let input = "enterox:)"  -- missing " "
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid boolean declaration" $ do
@@ -33,11 +33,11 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Declaration Booleana "yes"]
 
     it "rejects an invalid boolean declaration" $ do
-        let input = "booleana x"  -- Missing ":)"
+        let input = "booleana x"  -- missing ":)"
         parseMyLang input `shouldSatisfy` isLeft
 
     it "rejects an invalid boolean declaration" $ do
-        let input = "booleana y = verdad:)"  -- Cannot have assignment in declaration
+        let input = "booleana y = verdad:)"  -- cannot have assignment in declaration
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid array declaration" $ do
@@ -45,11 +45,11 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Declaration (Array Entero) "a"]
 
     it "rejects an invalid array declaration" $ do
-        let input = "array a:)"  -- Missing type
+        let input = "array a:)"  -- missing type
         parseMyLang input `shouldSatisfy` isLeft
 
     it "rejects an invalid array declaration" $ do
-        let input = "array booleana:)"  -- Missing identifier
+        let input = "array booleana:)"  -- missing identifier
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid integer assignment" $ do
@@ -69,7 +69,7 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Assignment "x" (ArrayLit [IntLit 1,IntLit 2,IntLit 3])]
 
     it "parses an invalid integer array assignment" $ do
-        let input = "x = 1,2,3 :)" -- Missing "[]"
+        let input = "x = 1,2,3 :)" -- missing "[]"
         parseMyLang input `shouldSatisfy` isLeft
     
     it "parses a valid array access" $ do
@@ -117,7 +117,7 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Assignment "eq" (BinOp Leq (Var "x") (IntLit 5))]
 
     it "reject an invalid integer addition" $ do
-        let input = "x + 5 :)" -- Missing assignment (result needs to be assigned to a variable)
+        let input = "x + 5 :)" -- missing assignment (result needs to be assigned to a variable)
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid boolean conjunction" $ do
@@ -165,11 +165,11 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [While (BoolLit True) [Assignment "x" (IntLit 3)]]   
 
     it "rejects an invalid while statement" $ do
-        let input = "durante verdad x = 3:)" -- Missing "{}"
+        let input = "durante verdad x = 3:)" -- missing "{}"
         parseMyLang input `shouldSatisfy` isLeft 
 
     it "rejects an invalid program" $ do
-        let input = "x = 5"  -- Missing ":)"
+        let input = "x = 5"  -- missing ":)"
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses program with multiple line comment" $ do
@@ -181,7 +181,7 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [Declaration Booleana "yes",Assignment "yes" (BoolLit True)]
 
     it "rejects program with incorrect multi line comment" $ do
-        let input = "booleana yes:) /*hello \n \n yes = verdad:)" -- Missing "*/"
+        let input = "booleana yes:) /*hello \n \n yes = verdad:)" -- missing "*/"
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid thread creation" $ do
@@ -189,7 +189,7 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [ThreadCreate [Declaration Entero "x",Assignment "x" (BinOp MyParser.Add (IntLit 5) (IntLit 1))]]
 
     it "rejects an invalid thread creation" $ do
-        let input = "hilo :)" -- Missing scope
+        let input = "hilo :)" -- missing scope
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid join" $ do
@@ -197,15 +197,15 @@ parserSpec = describe "Parser" $ do
         parseMyLang input `shouldBe` Right [ThreadJoin]
 
     it "parses a valid global variable declaration" $ do
-        let input = "global entero x:)" -- Declares an integer
+        let input = "global entero x:)" -- declares an integer
         parseMyLang input `shouldBe` Right [Declaration (Global Entero) "x"]
 
     it "parses an invalid global variable declaration" $ do
-        let input = "global x:)" -- Missing type
+        let input = "global x:)" -- missing type
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses an invalid global variable declaration" $ do
-        let input = "global entero:)" -- Missing variable identifier
+        let input = "global entero:)" -- missing variable identifier
         parseMyLang input `shouldSatisfy` isLeft
 
     it "parses a valid lock creation" $ do
@@ -290,26 +290,26 @@ typeCheckerSpec = describe "Type Checker" $ do
         it "rejects an invalid assignment" $ do
             let stmts = [
                     Declaration Entero "x",
-                    Assignment "x" (BoolLit True)  -- Type error
+                    Assignment "x" (BoolLit True)  -- type error
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid condition" $ do
             let stmts = [
-                    If (IntLit 5) [Print (IntLit 5)] [Print (IntLit 7)]  -- Non-boolean condition
+                    If (IntLit 5) [Print (IntLit 5)] [Print (IntLit 7)]  -- non-boolean condition
                     ]
             checkTypeInvalid stmts
 
         it "rejects an undefined variable" $ do
             let stmts = [
-                    Assignment "x" (IntLit 5)  -- Undeclared variable
+                    Assignment "x" (IntLit 5)  -- undeclared variable
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid array" $ do
             let stmts = [
                     Declaration (Array Entero) "arr",
-                    Assignment "arr" (ArrayLit [IntLit 1, BoolLit True, IntLit 3])  -- Non-homogeneous types
+                    Assignment "arr" (ArrayLit [IntLit 1, BoolLit True, IntLit 3])  -- non-homogeneous types
                     ]
             checkTypeInvalid stmts
 
@@ -318,39 +318,41 @@ typeCheckerSpec = describe "Type Checker" $ do
 
         it "rejects an invalid while loop condition" $ do
             let stmts = [
-                    While (IntLit 5) [Print (IntLit 5)]  -- Non-boolean condition
+                    While (IntLit 5) [Print (IntLit 5)]  -- non-boolean condition
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid thread creation" $ do
             let stmts = [
-                    ThreadCreate [Assignment "x" (IntLit 5)]  -- Undeclared variable
+                    ThreadCreate [Assignment "x" (IntLit 5)]  -- undeclared variable
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid global declaration" $ do
             let stmts = [
                     (Declaration (Global Entero) "x"),
-                    Assignment "x" (BoolLit True)  -- Type error
+                    Assignment "x" (BoolLit True)  -- type error
                     ]
             checkTypeInvalid stmts
 
+        -- locks are handled like global variables
+        -- so if type checker pass this, it also handles classic global variables
         it "rejects an invalid lock free" $ do
             let stmts = [
                     LockCreate "lock",
-                    LockFree "lock2"  -- Undeclared lock
+                    LockFree "lock2"  -- undeclared lock
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid lock free" $ do
             let stmts = [
-                    LockFree "lock"  -- Undeclared lock
+                    LockFree "lock"  -- undeclared lock
                     ]
             checkTypeInvalid stmts
 
         it "rejects an invalid lock get" $ do
             let stmts = [
-                    LockGet "lock"  -- Undeclared lock
+                    LockGet "lock"  -- undeclared lock
                     ]
             
             checkTypeInvalid stmts
@@ -410,6 +412,12 @@ codeGenSpec = describe "Code generation" $ do
 
         codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 37),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 37) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
 
+
+    -- TODO : add tests for while loops, locks and arrays 
+    -- Add tests that contains runtime errors ( ex : div by 0) for each features
+    -- Add multiple simple algorithms to calculate dumb stuff like number of days in a month of a year
+    -- Add tests for non-terminating algorithms
+    -- Add dumb programs that uses arrays.
 
 main :: IO ()
 main = hspec $ do
