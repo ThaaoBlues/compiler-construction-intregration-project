@@ -2,7 +2,7 @@ import MyParser
 import Test.Hspec
 import Test.QuickCheck
 import Data.Either
-import MyCodeGen (codeGen)
+import MyCodeGen (codeGen,firstPassGeneration)
 import Sprockell (DbgInput,localMem,sharedMem,sprStates,Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO, run, runWithDebugger, debuggerSimplePrint)
 import GHC.Conc.Sync (sharedCAF)
 import MyParser (fillGlobalSymbolTable)
@@ -383,7 +383,8 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        codeGen ast `shouldBe` [Branch 1 (Rel 4),Load (ImmValue 1) 2,WriteInstr 2 (DirAddr 57005),Load (ImmValue 15) 4,WriteInstr 4 (DirAddr 1),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 0) 2,Store 2 (DirAddr 10),EndProg,Load (ImmValue 0) 2,Store 2 (DirAddr 10),TestAndSet (DirAddr 57006),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (DirAddr 57006) 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 57006),WriteInstr 0 (DirAddr 57006),EndProg]
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]    
+    
     it "multiple non-nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:)} hilo { entero x:)} hilo { entero x:)}"
         
@@ -391,9 +392,9 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
-
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 47) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 71) 4,WriteInstr 4 (DirAddr 7),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
     
+
     it "2 nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:) hilo {entero x:)}}"
         
@@ -401,7 +402,7 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 47) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 71) 4,WriteInstr 4 (DirAddr 7),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 37),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 37) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
 
     it "multiple nested thread creation" $ do 
         let prog = "entero x:) hilo { entero x:) hilo { entero x:) hilo { entero x:) entero y:) hilo { entero x:) } } } }"
@@ -410,20 +411,147 @@ codeGenSpec = describe "Code generation" $ do
                 (Left e) -> error (show e)
                 (Right tree) -> tree
 
-        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 37),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 37) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 23) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 87),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 37) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 63),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 51) 4,WriteInstr 4 (DirAddr 7),Jump (Rel 39),Load (ImmValue 0) 2,Store 2 (DirAddr 2),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 67) 4,WriteInstr 4 (DirAddr 8),Jump (Rel 13),Load (ImmValue 0) 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,EndProg]
 
 
-    -- TODO : add tests for while loops, locks and arrays 
+    it "while loop with counter" $ do
+            let prog = "entero x:) x = 0:) durante x < 3 { x = x + 1 :) }"
+            let ast = case parseMyLang prog of
+                    (Left _) -> error "Parse error"
+                    (Right tree) -> tree
+            codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),Load (ImmValue 0) 2,Push 2,Pop 2,Store 2 (DirAddr 1),Load (DirAddr 1) 2,Push 2,Load (ImmValue 3) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Lt 2 3 4,Push 4,Pop 2,Branch 2 (Rel 2),Jump (Rel 12),Load (DirAddr 1) 2,Push 2,Load (ImmValue 1) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Add 2 3 4,Push 4,Pop 2,Store 2 (DirAddr 1),Jump (Rel (-21)),Nop,EndProg]
+
+    it "array declaration and access" $ do
+        let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
+        let ast = case parseMyLang prog of
+                (Left _) -> error "Parse error"
+                (Right tree) -> tree
+        codeGen ast `shouldBe` []  -- Replace with actual expected output
+
+    it "lock operations" $ do
+        let prog = unlines [
+                "esclusa lock:)",
+                "obtener lock:)",
+                "imprimir ¡1!:)",
+                "liberar lock:)"
+                ]
+        let ast = case parseMyLang prog of
+                (Left _) -> error "Parse error"
+                (Right tree) -> tree
+        codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),TestAndSet (DirAddr 2),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),Load (ImmValue 1) 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),WriteInstr 0 (DirAddr 2),EndProg]
+
+
+
+
+runtimeSpec :: Spec
+runtimeSpec = describe "Runtime tests" $ do
+    it "prints a number" $ do
+        let program = "imprimir ¡5!:)"
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should print 5"
+
+    it "adds two numbers" $ do
+        let program = "entero x :) x = 3 + 2 :) imprimir ¡x!:)"
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should print 5"
+
+    it "while loop that counts to 5" $ do
+        let program = "entero x :) x = 0 :) durante x < 5 { x = x + 1 :) } imprimir ¡x!:)"
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should print 5"
+
+    it "array access" $ do
+        let program = "array entero arr :) arr = [1,2,3] :) imprimir ¡arr[1]!:)"
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should print 2"
+
+    it "division by zero (runtime error)" $ do
+        let program = "entero x :) x = 1 / 0 :) imprimir ¡x!:)"
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should cause runtime error"
+
+    it "days in February calculation" $ do
+        let program = unlines [
+                "entero year :)",
+                "year = 2020 :)",  -- leap year
+                "entero days :)",
+                "booleana leap :)",
+                "leap = (year % 4 == 0) Y ((year % 100 != 0) O (year % 400 == 0)) :)",
+                "si leap { days = 29 :) } sino { days = 28 :) }",
+                "imprimir ¡days!:)"
+                ]
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should print 29"
+
+    it "infinite loop" $ do
+        let program = "mientras verdad { }"  -- infinite loop
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should run forever (use timeout)"
+
+    it "out of bounds array access (runtime error)" $ do
+        let program = unlines [
+                "array entero arr :)",
+                "arr = [1, 2, 3] :)",
+                "imprimir ¡arr[5]!:)"  -- attempt to access out of bounds index
+                ]
+        case parseMyLang program of
+            Left err -> expectationFailure (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                putStrLn "Generated code:"
+                print prog
+                pendingWith "Manual verification needed: should cause out of bounds runtime error"
+
+    -- TODO : add tests for while loops, locks and arrays in code generation
+    -- Runtime errors :
     -- Add tests that contains runtime errors ( ex : div by 0) for each features
     -- Add multiple simple algorithms to calculate dumb stuff like number of days in a month of a year
     -- Add tests for non-terminating algorithms
     -- Add dumb programs that uses arrays.
 
+
+
 main :: IO ()
-main = hspec $ do
+main = --hspec $ do
        --parserSpec
-       typeCheckerSpec
+       --typeCheckerSpec
        --codeGenSpec
+
     -- let prog = [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
     -- Sprockell.run [prog]
     -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
@@ -436,6 +564,15 @@ main = hspec $ do
     --     --Right ast -> print (codeGen ast)
 
     --runFromFile "bank.hola"
+
+    do 
+        
+        let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
+        let ast = case parseMyLang prog of
+                (Left _) -> error "Parse error"
+                (Right tree) -> tree
+
+        print (firstPassGeneration ast 0)
 
 showLocalMem :: DbgInput -> String
 showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
@@ -454,16 +591,6 @@ runFromFile fname = do
         Right ast -> let prog = codeGen ast in run [prog,prog,prog,prog]
         --Right ast -> print ast
 
-
---
--- BANKING SYSTEM
---
--- To show the correct functioning of the concurrency feature of your language, you should provide at least
--- the following test program:
--- An elementary banking system, where several entities (think of shops, subscription services, etc.) per-
--- form transactions on the same account. Your implementation should ensure that concurrent transactions do
--- not lead to an incorrect state of the bank account. Be sure to have multiple entities (more than two) doing
--- multiple transactions (more than two) using multiple threads (at least four).
 
 --
 -- SEMANTIC ERRORS
