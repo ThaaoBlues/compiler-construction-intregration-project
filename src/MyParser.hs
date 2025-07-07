@@ -429,7 +429,7 @@ lookupTable::SymbolTable->String->Either String Type
 lookupTable [] tid = Left ("Variable "++tid++" out of scope")
 lookupTable [(id,vartype)] tid 
   | id == tid = Right vartype
-  | otherwise = Left ("Variable "++tid++"of wrong type or out of scope")
+  | otherwise = Left ("Variable "++tid++" of wrong type or out of scope")
 
 lookupTable ((id,vartype):xs) tid 
   | id == tid = Right vartype

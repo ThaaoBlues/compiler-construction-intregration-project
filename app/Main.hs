@@ -5,6 +5,7 @@ import MyCodeGen (codeGen)
 import Sprockell (regA,regB,regC,regD,regE,runWithDebugger,debuggerSimplePrint,DbgInput,localMem,sprStates, Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO, run)
 import Data.Char
 import System.Environment (getArgs)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 
 main :: IO ()
 main = do 
@@ -14,6 +15,7 @@ main = do
 
 runFromFile :: String->IO ()
 runFromFile fname = do
+    setLocaleEncoding utf8
     input <- readFile fname
     case parseMyLang input of
         Left err -> error (show err)
