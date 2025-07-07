@@ -10,7 +10,6 @@ import Text.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 import Text.Parsec.Combinator (chainl1)
 import Data.Type.Coercion (sym)
 
--- Define the lexer
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser haskellStyle
   { Tok.commentLine = "//"
@@ -22,7 +21,7 @@ lexer = Tok.makeTokenParser haskellStyle
   , Tok.reservedOpNames = ["+", "-", "*", "==", "!=", "<", "<=", ">", ">=", "Y", "O", "~:(", "=", ":)", ",", "[", "]", "¡", "!", "{", "}"]
   }
 
--- Helper parsers
+-- helper parsers
 reserved :: String -> Parser ()
 reserved = Tok.reserved lexer
 
@@ -53,7 +52,7 @@ brackets = Tok.brackets lexer
 commaSep :: Parser a -> Parser [a]
 commaSep = Tok.commaSep lexer
 
--- AST definition
+-- EDSL definition
 data Type = Entero | Booleana | Array Type| Lock | Global Type |CompilationError String
           deriving (Show, Eq)
 
@@ -97,7 +96,7 @@ data Stmt = Declaration Type String
           | ScopeBlock [Stmt]
           deriving (Show,Eq)
 
--- Parser for type identifiers
+-- parser for type identifiers
 typeIdentifier :: Parser Type
 typeIdentifier =
               (Global <$ reserved "global") <*> typeIdentifier
@@ -105,7 +104,7 @@ typeIdentifier =
             <|> (Booleana <$ reserved "booleana")
             <|> ( (Array <$ reserved "array") <*> typeIdentifier) -- ex : array entero = [1,2,3]:)
 
--- Parser for primary expressions
+-- parser for primary expressions (directly hardcoded things)
 primaryExpr :: Parser Expr
 primaryExpr = try (IntLit <$> integer)
           <|> try (BoolLit True <$ reserved "verdad")
@@ -117,21 +116,21 @@ primaryExpr = try (IntLit <$> integer)
 arrayLiteral :: Parser Expr
 arrayLiteral = (ArrayLit <$ symbol "[") <*> (commaSep expr <* symbol "]")
 
--- Parser for unary expressions
+-- parser for unary expressions
 unaryExpr :: Parser Expr
 unaryExpr = (UnOp Not <$> (reservedOp "~:(" *> unaryExpr)) -- NOT
             <|> (UnOp Inv <$> (reservedOp "-" *> unaryExpr))-- Int INVERSION
             <|> primaryExpr
 
--- Parser for multiplicative expressions
+-- parser for multiplicative expressions
 multExpr :: Parser Expr
 multExpr = chainl1 unaryExpr (BinOp Mul <$ reservedOp "*")
 
--- Parser for additive expressions
+-- parser for additive expressions
 addExpr :: Parser Expr
 addExpr = chainl1 multExpr $ (BinOp Add <$ reservedOp "+") <|> (BinOp Sub <$ reservedOp "-")
 
--- Parser for relational expressions
+-- parser for relational expressions
 relExpr :: Parser Expr
 relExpr = do
   e1 <- addExpr
@@ -145,7 +144,7 @@ relExpr = do
 
 
 
--- Parser for equality expressions
+-- parser for equality expressions
 equalityExpr :: Parser Expr
 equalityExpr = do
   e1 <- relExpr
@@ -153,18 +152,18 @@ equalityExpr = do
       BinOp op e1 <$> relExpr
    ) <|> return e1
 
--- Parser for AND expressions
+-- parser for AND expressions
 andExpr :: Parser Expr
 andExpr = chainl1 equalityExpr (BinOp And <$ reservedOp "Y")
 
--- Parser for OR expressions
+-- parser for OR expressions
 orExpr :: Parser Expr
 orExpr = chainl1 andExpr (BinOp Or <$ reservedOp "O")
 
 expr :: Parser Expr
 expr = try accessArray <|> orExpr 
 
--- Helper parsers for scopes
+-- helper parsers for scopes
 beginScope :: Parser ()
 beginScope = reserved "iniciamos" <|> () <$ symbol "{"
 
@@ -186,7 +185,7 @@ scopeBlock = do
   --symbol ":)"
   return $ ScopeBlock blockContent
 
--- Parser for statements
+-- parser for statements
 declaration :: Parser Stmt
 declaration = do
   typeId <- typeIdentifier
@@ -286,14 +285,14 @@ statement = try declaration
 program :: Parser [Stmt]
 program = many statement <* eof
 
--- Helper function to parse a program
+-- helper function to parse a program
 parseMyLang :: String -> Either ParseError [Stmt]
 parseMyLang = parse program ""
 
 {-
 ================================================================
 
-TYPE CHECKING
+                           TYPE CHECKING
 
 ================================================================
 
@@ -309,7 +308,7 @@ type SymbolTable = [(String,Type)]
 type STStack = [SymbolTable] -- to support scopes
 
 
-
+-- called stackChecking because we make use of a stack to check types of local variables and expressions
 stackChecking :: [Stmt] -> SymbolTable->STStack -> [String]
 stackChecking [] _ _ = []
 stackChecking (x:xs) gt stack =
