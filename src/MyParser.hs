@@ -186,6 +186,7 @@ scopeBlock = do
   return $ ScopeBlock blockContent
 
 -- parser for statements
+-- the name of the function refers exactly to what it parses
 declaration :: Parser Stmt
 declaration = do
   typeId <- typeIdentifier
@@ -315,6 +316,9 @@ stackChecking (x:xs) gt stack =
   let st = fillSymbolTable (x:xs) : stack
   in case x of
 
+    -- we concatenate all errors that we got so the end used gets a full report
+
+    -- recursively explore and check if bodies
     If e body1 body2 ->
       let errsCond = case inferType e gt st of
                         Booleana -> []
@@ -324,6 +328,7 @@ stackChecking (x:xs) gt stack =
           errsBody2 = stackChecking body2 gt st
       in errsCond ++ errsBody1 ++ errsBody2 ++ stackChecking xs gt stack
 
+    -- recursively explores and checks while body
     While e body ->
       let errsCond = case inferType e gt st of
                         Booleana -> []
@@ -332,14 +337,18 @@ stackChecking (x:xs) gt stack =
           errsBody = stackChecking body gt st
       in errsCond ++ errsBody ++ stackChecking xs gt stack
 
+
+
     Assignment id e ->
         let exprType = inferType e gt st
                         
 
+            -- did the right hand side expression get a proper typing ?
             errType = case exprType of
                         (CompilationError s ) -> [s]
                         _ -> []
             
+            -- did we declare that variable ?
             varType = case lookupStack st id of
               (Left s) -> case lookupTable gt id of
                             (Left s)-> CompilationError s
@@ -347,11 +356,13 @@ stackChecking (x:xs) gt stack =
               (Right t) -> t
 
 
+            -- catch error for variable declaration
             errVarLookup = case varType of
                         (CompilationError s ) -> [s]
                         _ -> []
             
 
+            -- are both sides of the same type ?
             errAssign = case varType of
                   (CompilationError s) -> []
                   t1 -> case exprType of
@@ -365,6 +376,8 @@ stackChecking (x:xs) gt stack =
         in errAssign++ errType++errVarLookup ++ stackChecking xs gt stack
 
     LockGet id ->
+
+      -- did we declare that lock first ?
       let errs = case lookupStack st id of
                    (Left s )-> case lookupTable gt id of
                                 (Left s) -> [s]
@@ -373,6 +386,8 @@ stackChecking (x:xs) gt stack =
       in errs ++ stackChecking xs gt stack
 
     LockFree id ->
+
+      -- did we declare that lock first ?
       let errs = case lookupStack st id of
                    (Left s) -> case lookupTable gt id of
                                   (Left s)-> [s]
@@ -383,6 +398,7 @@ stackChecking (x:xs) gt stack =
     ThreadCreate body ->
       -- new scope, no outer variables
       let newStack = [fillSymbolTable body]
+      -- recursively checks typing in thread body
       in stackChecking body gt newStack ++ stackChecking xs gt stack
 
     ScopeBlock body ->
