@@ -6,16 +6,24 @@
 
 This project implements a custom programming language with a focus on basic types, expressions, variable typing, and concurrency features. The language is designed to be strongly typed and supports multi-threading with locks for synchronization.
 
+## Installing the compiler
+- get all the files
+- navigate into the root directory of the compiler
 
 ## Running the compiler
 
 ### Compile a given file and start program on Sprockells
+
 ```bash 
 stack run file_name.whatever_extension
 ```
 It is possible to use whatever file you want to write code in it as long as it contains brut text.
 Number of threads (and by extension, required Sprockells) should be automatically determined by the compiler.
 
+### Rinning the automated tests
+```bash 
+stack test
+```
 
 ## Language Features
 
