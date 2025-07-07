@@ -10,10 +10,12 @@ This project implements a custom programming language with a focus on basic type
 ## Running the compiler
 
 ### Compile a given file and start program on Sprockells
-> stack run file_name.whatever_extension
+```bash 
+stack run file_name.whatever_extension
+```
 It is possible to use whatever file you want to write code in it as long as it contains brut text.
+Number of threads (and by extension, required Sprockells) should be automatically determined by the compiler.
 
-## 
 
 ## Language Features
 

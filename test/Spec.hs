@@ -11,7 +11,11 @@ checkTypeValid :: [Stmt] -> Expectation
 checkTypeValid stmts = stackChecking stmts (MyParser.fillGlobalSymbolTable stmts) [fillSymbolTable stmts] `shouldBe` []
 
 checkTypeInvalid :: [Stmt] -> Expectation
-checkTypeInvalid stmts = stackChecking stmts (MyParser.fillGlobalSymbolTable stmts) [fillSymbolTable stmts] `shouldNotBe` []
+checkTypeInvalid stmts = do 
+    let errors =stackChecking stmts (MyParser.fillGlobalSymbolTable stmts) [fillSymbolTable stmts]
+    print "errors detected by compiler : \n"
+    print errors
+    errors `shouldNotBe` []
 
 -- tests for the parser
 parserSpec :: Spec
