@@ -1,5 +1,5 @@
 module MyCodeGen
-    ( codeGen ) where
+    ( codeGen,firstPassGeneration ) where
 
 import Sprockell (Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO,numberIO, regE, regF)
 import MyParser (Stmt(..), Expr(..), Op(..), Type(..), fillSymbolTable)
@@ -15,6 +15,8 @@ type ThreadInfo = (Int, Int, [Stmt])
 type GlobalThreadsTable = [ThreadInfo]
 
 type LocalVarStack = [GlobalSymbolTable]
+
+-- isjsqhdfksjhdf
 
 -- add local variable to head of display stack
 getFirstAvailableLocalVarAddr :: LocalVarStack->Int
@@ -123,17 +125,36 @@ firstPassGeneration ((Declaration typ name):xs) lc = do
 
 firstPassGeneration (_:xs) lc = firstPassGeneration xs lc
 
+-- get maximum possible length for a given array in all program history
+-- used to know how much memory to allocate 
+getMaxLengthForThisArray :: [Stmt]->String->Int
+getMaxLengthForThisArray [] _  = 0
+getMaxLengthForThisArray ((ScopeBlock body):xs) vname = max thisBodyMax newBodyMax
+  where thisBodyMax = getMaxLengthForThisArray xs vname
+        newBodyMax = getMaxLengthForThisArray body vname
 
+getMaxLengthForThisArray ((While _ body):xs) vname = max thisBodyMax newBodyMax
+  where thisBodyMax = getMaxLengthForThisArray xs vname
+        newBodyMax = getMaxLengthForThisArray body vname 
+
+getMaxLengthForThisArray ((If _ body1 body2):xs) vname = maximum [thisBodyMax,newBodyMax1,newBodyMax2]
+  where thisBodyMax = getMaxLengthForThisArray xs vname
+        newBodyMax1 = getMaxLengthForThisArray body1 vname        
+        newBodyMax2 = getMaxLengthForThisArray body2 vname
+
+getMaxLengthForThisArray ((Assignment id (ArrayLit arr)):xs) vname
+  | id == vname = max (length arr) nextMax
+  | otherwise = nextMax
+  where nextMax = getMaxLengthForThisArray xs id
 
 -- like first pass but only for local variables,
 -- to be used when dynamcally extending stack for while/if bodies and in thread creation
 fillLocalDisplayForThisBody :: LocalVarStack->[Stmt] -> LocalVarStack
-fillLocalDisplayForThisBody st [] = st 
-fillLocalDisplayForThisBody st ((Declaration typ name):xs) = addLocalVariable st2 name
-  where st2 = fillLocalDisplayForThisBody st xs 
-fillLocalDisplayForThisBody st (x:xs) = fillLocalDisplayForThisBody st xs
-
-
+fillLocalDisplayForThisBody st [] = st
+-- array assignement, take biggest array size in all body for that id as size to allocate
+fillLocalDisplayForThisBody st ((Declaration (Array _) id):xs) = do
+  let arrSize = 5 -- we fix a MAX SIZE OF 5
+  
 
 
 -- SECOND PASS: generate all code to determine exact sizes with proper nested thread handling
@@ -263,10 +284,6 @@ generateStmtCode gt st (Declaration typ name) =
 generateStmtCode gt st (Assignment name expr) =
   do
   let exprCode = generateExprCode gt st expr
-
-  -- TODO : differentiate the case of local vars from global ones
-  -- (Store vs WriteInstr)
-  -- priority is given on local vars in case of name collision
 
   let result = getMemAddrforLocalVarMaybe st name
   case result of
