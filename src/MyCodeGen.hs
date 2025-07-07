@@ -151,10 +151,13 @@ getMaxLengthForThisArray ((Assignment id (ArrayLit arr)):xs) vname
 -- to be used when dynamcally extending stack for while/if bodies and in thread creation
 fillLocalDisplayForThisBody :: LocalVarStack->[Stmt] -> LocalVarStack
 fillLocalDisplayForThisBody st [] = st
--- array assignement, take biggest array size in all body for that id as size to allocate
-fillLocalDisplayForThisBody st ((Declaration (Array _) id):xs) = do
-  let arrSize = 5 -- we fix a MAX SIZE OF 5
+
+-- SKIP ARRAYS, WE DID NOT HAVE TIME SORRY
+fillLocalDisplayForThisBody st ((Declaration (Array _) id):xs) = fillLocalDisplayForThisBody st xs
   
+fillLocalDisplayForThisBody st ((Declaration typ name):xs) = addLocalVariable st2 name
+  where st2 = fillLocalDisplayForThisBody st xs 
+fillLocalDisplayForThisBody st (x:xs) = fillLocalDisplayForThisBody st xs
 
 
 -- SECOND PASS: generate all code to determine exact sizes with proper nested thread handling

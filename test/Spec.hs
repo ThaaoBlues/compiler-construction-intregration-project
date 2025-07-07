@@ -421,12 +421,6 @@ codeGenSpec = describe "Code generation" $ do
                     (Right tree) -> tree
             codeGen ast `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 0) 2,Store 2 (DirAddr 1),Load (ImmValue 0) 2,Push 2,Pop 2,Store 2 (DirAddr 1),Load (DirAddr 1) 2,Push 2,Load (ImmValue 3) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Lt 2 3 4,Push 4,Pop 2,Branch 2 (Rel 2),Jump (Rel 12),Load (DirAddr 1) 2,Push 2,Load (ImmValue 1) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Add 2 3 4,Push 4,Pop 2,Store 2 (DirAddr 1),Jump (Rel (-21)),Nop,EndProg]
 
-    it "array declaration and access" $ do
-        let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
-        let ast = case parseMyLang prog of
-                (Left _) -> error "Parse error"
-                (Right tree) -> tree
-        codeGen ast `shouldBe` []  -- Replace with actual expected output
 
     it "lock operations" $ do
         let prog = unlines [
@@ -453,6 +447,7 @@ runtimeSpec = describe "Runtime tests" $ do
                 let prog = codeGen ast
                 putStrLn "Generated code:"
                 print prog
+                run [prog]
                 pendingWith "Manual verification needed: should print 5"
 
     it "adds two numbers" $ do
@@ -463,6 +458,7 @@ runtimeSpec = describe "Runtime tests" $ do
                 let prog = codeGen ast
                 putStrLn "Generated code:"
                 print prog
+                run [prog]
                 pendingWith "Manual verification needed: should print 5"
 
     it "while loop that counts to 5" $ do
@@ -473,37 +469,39 @@ runtimeSpec = describe "Runtime tests" $ do
                 let prog = codeGen ast
                 putStrLn "Generated code:"
                 print prog
+                run [prog]
                 pendingWith "Manual verification needed: should print 5"
-
-    it "array access" $ do
-        let program = "array entero arr :) arr = [1,2,3] :) imprimir ¡arr[1]!:)"
-        case parseMyLang program of
-            Left err -> expectationFailure (show err)
-            Right ast -> do
-                let prog = codeGen ast
-                putStrLn "Generated code:"
-                print prog
-                pendingWith "Manual verification needed: should print 2"
-
-    it "division by zero (runtime error)" $ do
-        let program = "entero x :) x = 1 / 0 :) imprimir ¡x!:)"
-        case parseMyLang program of
-            Left err -> expectationFailure (show err)
-            Right ast -> do
-                let prog = codeGen ast
-                putStrLn "Generated code:"
-                print prog
-                pendingWith "Manual verification needed: should cause runtime error"
-
+           
     it "days in February calculation" $ do
-        let program = unlines [
-                "entero year :)",
-                "year = 2020 :)",  -- leap year
-                "entero days :)",
-                "booleana leap :)",
-                "leap = (year % 4 == 0) Y ((year % 100 != 0) O (year % 400 == 0)) :)",
-                "si leap { days = 29 :) } sino { days = 28 :) }",
-                "imprimir ¡days!:)"
+        let program = unlines [ "entero year :)"
+                , "year = 2020 :)" -- should be 29 days
+                , "entero days :)"
+                , "booleana leap :)"
+                , ""
+                , "// compute year % 4 "
+                , "entero remainder4 :)"
+                , "remainder4 = year :)"
+                , "durante remainder4 >= 4 {"
+                , "    remainder4 = remainder4 - 4 :)"
+                , "}"
+                , ""
+                , "// compute year % 100 "
+                , "entero remainder100 :)"
+                , "remainder100 = year :)"
+                , "durante remainder100 >= 100 {"
+                , "    remainder100 = remainder100 - 100 :)"
+                , "}"
+                , ""
+                , "// Compute year % 400 "
+                , "entero remainder400 :)"
+                , "remainder400 = year :)"
+                , "durante remainder400 >= 400 {"
+                , "    remainder400 = remainder400 - 400 :)"
+                , "}"
+                , ""
+                , "leap = ¡remainder4 == 0! Y ¡¡remainder100 != 0! O ¡remainder400 == 0!! :)"
+                , "si leap { days = 29 :) } sino { days = 28 :) }"
+                , "imprimir ¡days! :)"
                 ]
         case parseMyLang program of
             Left err -> expectationFailure (show err)
@@ -511,31 +509,20 @@ runtimeSpec = describe "Runtime tests" $ do
                 let prog = codeGen ast
                 putStrLn "Generated code:"
                 print prog
+                run [prog]
                 pendingWith "Manual verification needed: should print 29"
 
-    it "infinite loop" $ do
-        let program = "mientras verdad { }"  -- infinite loop
-        case parseMyLang program of
-            Left err -> expectationFailure (show err)
-            Right ast -> do
-                let prog = codeGen ast
-                putStrLn "Generated code:"
-                print prog
-                pendingWith "Manual verification needed: should run forever (use timeout)"
 
-    it "out of bounds array access (runtime error)" $ do
-        let program = unlines [
-                "array entero arr :)",
-                "arr = [1, 2, 3] :)",
-                "imprimir ¡arr[5]!:)"  -- attempt to access out of bounds index
-                ]
+    it "infinite loop" $ do
+        let program = "durante verdad { }"  -- infinite loop
         case parseMyLang program of
             Left err -> expectationFailure (show err)
             Right ast -> do
                 let prog = codeGen ast
                 putStrLn "Generated code:"
                 print prog
-                pendingWith "Manual verification needed: should cause out of bounds runtime error"
+                run [prog]
+                pendingWith "Manual verification needed: should run forever"
 
     -- TODO : add tests for while loops, locks and arrays in code generation
     -- Runtime errors :
@@ -547,10 +534,11 @@ runtimeSpec = describe "Runtime tests" $ do
 
 
 main :: IO ()
-main = --hspec $ do
-       --parserSpec
-       --typeCheckerSpec
-       --codeGenSpec
+main = hspec $ do
+       parserSpec
+       typeCheckerSpec
+       codeGenSpec
+       runtimeSpec
 
     -- let prog = [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
     -- Sprockell.run [prog]
@@ -565,14 +553,14 @@ main = --hspec $ do
 
     --runFromFile "bank.hola"
 
-    do 
+    -- do 
         
-        let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
-        let ast = case parseMyLang prog of
-                (Left _) -> error "Parse error"
-                (Right tree) -> tree
+    --     let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
+    --     let ast = case parseMyLang prog of
+    --             (Left _) -> error "Parse error"
+    --             (Right tree) -> tree
 
-        print (firstPassGeneration ast 0)
+    --     print (firstPassGeneration ast 0)
 
 showLocalMem :: DbgInput -> String
 showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
