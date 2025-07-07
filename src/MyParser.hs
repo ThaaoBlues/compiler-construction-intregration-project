@@ -421,7 +421,7 @@ fillSymbolTable (_:xs) = fillSymbolTable xs
 -- same but for global variables
 fillGlobalSymbolTable::[Stmt]->SymbolTable
 fillGlobalSymbolTable [] = []
-fillGlobalSymbolTable ((Declaration (Global t) id):xs) = (id,t) : fillSymbolTable xs 
+fillGlobalSymbolTable ((Declaration (Global t) id):xs) = (id,t) : fillGlobalSymbolTable xs 
 fillGlobalSymbolTable ((LockCreate id):xs) = (id,Lock) : fillGlobalSymbolTable xs
 fillGlobalSymbolTable (_:xs) = fillGlobalSymbolTable xs
 

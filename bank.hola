@@ -79,7 +79,9 @@ hilo {
 entero old_balance:)
 old_balance=0:)
 
-durante verdad {
+entero x:)
+x = 4000:)
+durante x >= 0 {
     obtener account_lock:)
         si account_balance != old_balance {
             old_balance = account_balance:)
@@ -88,6 +90,8 @@ durante verdad {
 
         }
     liberar account_lock:)
+
+    x = x -1:)
 }
 
 

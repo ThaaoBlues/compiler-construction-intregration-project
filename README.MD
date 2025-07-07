@@ -4,7 +4,16 @@
 
 ## Overview
 
-This project implements a custom programming language with a focus on basic types, arrays, expressions, variable typing, and concurrency features. The language is designed to be strongly typed and supports multi-threading with locks for synchronization.
+This project implements a custom programming language with a focus on basic types, expressions, variable typing, and concurrency features. The language is designed to be strongly typed and supports multi-threading with locks for synchronization.
+
+
+## Running the compiler
+
+### Compile a given file and start program on Sprockells
+> stack run file_name.whatever_extension
+It is possible to use whatever file you want to write code in it as long as it contains brut text.
+
+## 
 
 ## Language Features
 
