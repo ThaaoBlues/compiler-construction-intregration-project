@@ -1,0 +1,47 @@
+global entero x :)
+esclusa lock :) // lock for the global variable
+x = 1 :)
+
+booleana r :) // initialized to False
+booleana s :)
+s = verdad :)
+
+/* 
+    initialize some (nested) threads
+    use the lock to prevent race conditions
+*/
+
+hilo {
+    imprimir¡x! :)
+    hilo {
+        obtener lock :)
+        x = x + 1 :)
+        imprimir¡x! :)
+        liberar lock :)
+    }
+}
+
+hilo {
+    obtener lock :)
+    x = x * 1 :)
+    imprimir ¡x! :)
+    liberar lock :)
+}
+
+esperamos :)
+
+si ~:( r {
+    imprimir ¡s! :)
+    imprimir ¡s O r! :)
+    imprimir ¡s Y r! :)
+}
+
+durante s iniciamos
+    si ¡x <= 0! {
+        s = mentira :)
+    } sino {
+        x = x - 1 :)
+    }
+cerramos
+
+imprimir ¡x! :)

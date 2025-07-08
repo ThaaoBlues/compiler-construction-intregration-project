@@ -1,0 +1,33 @@
+global entero account_balance:)
+esclusa account_lock:)
+
+// set a default balance before starting threads
+account_balance = 200:)
+
+// first shop
+hilo {
+    obtener account_lock:)
+    account_balance = account_balance + 10:)
+    liberar account_lock:)
+}
+
+// second shop
+hilo {
+    obtener account_lock:)
+    account_balance = account_balance + 2:)
+    liberar account_lock:)
+}
+
+
+// third shop
+hilo {
+    obtener account_lock:)
+    account_balance = account_balance + 100:)
+    liberar account_lock:)
+}
+
+esperamos:)
+
+imprimir¡account_balance!:)
+
+

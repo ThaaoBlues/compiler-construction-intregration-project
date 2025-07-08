@@ -1,6 +1,6 @@
 # Programming Paradigms Integrating Project
 
-**Date:** 04-07-2025
+**Date:** 08-07-2025
 
 ## Overview
 
@@ -20,7 +20,7 @@ stack run file_name.whatever_extension
 It is possible to use whatever file you want to write code in it as long as it contains brut text.
 Number of threads (and by extension, required Sprockells) should be automatically determined by the compiler.
 
-### Rinning the automated tests
+### Running the automated tests
 ```bash 
 stack test
 ```
