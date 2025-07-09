@@ -1,14 +1,14 @@
 name:                my-lang
 version:             0.1.0.0
 license:             MIT
-author:              "My Name"
+author:              "Theo Mougnibas & Iris Borgonjen"
 maintainer:          "my@address.here"
-copyright:           "2022 Author name here"
+copyright:           "2025 Theo Mougnibas & Iris Borgonjen"
 
 extra-source-files:
 - README.md
 
-description:         Implementation of MyLang.
+description:         Implementation of :D¡Queso!.
 
 dependencies:
 - base >= 4.7 && < 5

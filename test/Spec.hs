@@ -6,6 +6,7 @@ import MyCodeGen (codeGen,firstPassGeneration)
 import Sprockell (DbgInput,localMem,sharedMem,sprStates,Instruction(..), RegAddr, MemAddr, AddrImmDI(..), Target(..), SprID,Operator(..), reg0, RegAddr, regA, regB, regC, regSprID, charIO, run, runWithDebugger, debuggerSimplePrint)
 import GHC.Conc.Sync (sharedCAF)
 import MyParser (fillGlobalSymbolTable)
+import GHC.IO.Encoding (setLocaleEncoding, utf8)
 -- Helper functions for type checker tests
 checkTypeValid :: [Stmt] -> Expectation
 checkTypeValid stmts = stackChecking stmts (MyParser.fillGlobalSymbolTable stmts) [fillSymbolTable stmts] `shouldBe` []
@@ -517,16 +518,16 @@ runtimeSpec = describe "Runtime tests" $ do
                 pendingWith "Manual verification needed: should print 29"
 
 
-    it "infinite loop" $ do
-        let program = "durante verdad { }"  -- infinite loop
-        case parseMyLang program of
-            Left err -> expectationFailure (show err)
-            Right ast -> do
-                let prog = codeGen ast
-                putStrLn "Generated code:"
-                print prog
-                run [prog]
-                pendingWith "Manual verification needed: should run forever"
+    -- it "infinite loop" $ do
+    --     let program = "durante verdad { }"  -- infinite loop
+    --     case parseMyLang program of
+    --         Left err -> expectationFailure (show err)
+    --         Right ast -> do
+    --             let prog = codeGen ast
+    --             putStrLn "Generated code:"
+    --             print prog
+    --             run [prog]
+    --             pendingWith "Manual verification needed: should run forever"
 
     -- TODO : add tests for while loops, locks and arrays in code generation
     -- Runtime errors :
@@ -535,82 +536,31 @@ runtimeSpec = describe "Runtime tests" $ do
     -- Add tests for non-terminating algorithms
     -- Add dumb programs that uses arrays.
 
+extendedTest :: Spec
+extendedTest = describe "Extended program" $ do
+    it "Code generation" $ do
+        setLocaleEncoding utf8
+        input <- readFile "test.hola"
+        let tree = case parseMyLang input of
+                    Left err -> error (show err)
+                    Right ast -> ast
+        codeGen tree `shouldBe` [Branch 1 (Rel 2),Jump (Rel 8),Load (ImmValue 4) 2,Compute Sprockell.Add 2 1 4,ReadInstr (IndAddr 4),Receive 6,Compute Equal 6 0 7,Branch 7 (Rel (-4)),Jump (Ind 6),Load (ImmValue 1) 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 3),Load (ImmValue 0) 2,Store 2 (DirAddr 2),Load (ImmValue 0) 2,Store 2 (DirAddr 1),Load (ImmValue 1) 2,Push 2,Pop 2,Store 2 (DirAddr 1),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 33) 4,WriteInstr 4 (DirAddr 5),Jump (Rel 59),ReadInstr (DirAddr 3),Receive 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 50) 4,WriteInstr 4 (DirAddr 6),Jump (Rel 32),TestAndSet (DirAddr 2),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 3),Receive 2,Push 2,Load (ImmValue 1) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Add 2 3 4,Push 4,Pop 2,WriteInstr 2 (DirAddr 3),ReadInstr (DirAddr 3),Receive 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),WriteInstr 0 (DirAddr 2),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Incr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),Load (ImmValue 103) 4,WriteInstr 4 (DirAddr 7),Jump (Rel 32),TestAndSet (DirAddr 2),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 3),Receive 2,Push 2,Load (ImmValue 1) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Mul 2 3 4,Push 4,Pop 2,WriteInstr 2 (DirAddr 3),ReadInstr (DirAddr 3),Receive 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),WriteInstr 0 (DirAddr 2),TestAndSet (DirAddr 1),Receive 2,Branch 2 (Rel 2),Jump (Rel (-3)),ReadInstr (DirAddr 0),Receive 2,Compute Decr 2 2 2,WriteInstr 2 (DirAddr 0),WriteInstr 0 (DirAddr 1),EndProg,ReadInstr (DirAddr 0),Receive 2,Branch 2 (Rel 2),Jump (Rel 2),Jump (Rel (-4)),Load (DirAddr 2) 2,Push 2,Pop 2,Branch 2 (Rel 4),Load (ImmValue 1) 3,Push 3,Jump (Rel 2),Push 0,Nop,Pop 2,Branch 2 (Rel 2),Jump (Rel 25),Load (DirAddr 1) 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),Load (DirAddr 1) 2,Push 2,Load (DirAddr 2) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Or 2 3 4,Push 4,Pop 2,WriteInstr 2 (DirAddr 65536),Load (DirAddr 1) 2,Push 2,Load (DirAddr 2) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.And 2 3 4,Push 4,Pop 2,WriteInstr 2 (DirAddr 65536),Nop,Load (DirAddr 1) 2,Push 2,Pop 2,Branch 2 (Rel 2),Jump (Rel 30),ReadInstr (DirAddr 3),Receive 2,Push 2,Load (ImmValue 0) 2,Push 2,Pop 3,Pop 2,Compute LtE 2 3 4,Push 4,Pop 2,Branch 2 (Rel 13),ReadInstr (DirAddr 3),Receive 2,Push 2,Load (ImmValue 1) 2,Push 2,Pop 3,Pop 2,Compute Sprockell.Sub 2 3 4,Push 4,Pop 2,WriteInstr 2 (DirAddr 3),Jump (Rel 5),Load (ImmValue 0) 2,Push 2,Pop 2,Store 2 (DirAddr 1),Nop,Jump (Rel (-33)),Nop,ReadInstr (DirAddr 3),Receive 2,Push 2,Pop 2,WriteInstr 2 (DirAddr 65536),EndProg]
+
+    it "Runtime" $ do
+        setLocaleEncoding utf8
+        input <- readFile "test.hola"
+        case parseMyLang input of
+            Left err -> error (show err)
+            Right ast -> do
+                let prog = codeGen ast
+                run [prog, prog, prog, prog]
+                pendingWith "Manual verification needed: should output something like the following:\n \tSprockell 1 says 1\n \tSprockell 3 says 1\n \tSprockell 2 says 2\n \tSprockell 0 says 1\n \tSprockell 0 says 1\n \tSprockell 0 says 0\n \tSprockell 0 says 0\n"
 
 
 main :: IO ()
 main = hspec $ do
-       parserSpec
-       typeCheckerSpec
-       codeGenSpec
-       runtimeSpec
-
-    -- let prog = [Branch 1 (Rel 2),Load (ImmValue 0) 2,WriteInstr 2 (DirAddr 57005),Jump (Rel 7),ReadInstr (IndAddr 1),Receive 2,Compute Equal 2 0 3,Branch 3 (Rel (-3)),WriteInstr 2 (DirAddr 65536),Jump (Ind 2),Load (ImmValue 1) 2,Push 2,Pop 2,Branch 2 (Rel 17),Load (ImmValue 10) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Jump (Rel 17),Load (ImmValue 5) 2,Push 2,Load (ImmValue 79) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 85) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 84) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 58) 2,WriteInstr 2 (DirAddr 65537),Load (ImmValue 32) 2,WriteInstr 2 (DirAddr 65537),Pop 2,WriteInstr 2 (DirAddr 65537),Nop,EndProg]
-    -- Sprockell.run [prog]
-    -- let input = "booleana x:) x = verdad:) durante x {booleana y:) imprimir ¡5!:)  x = mentira:)}"
-    --let input = "entero x:) x = 0:) booleana a:) a = verdad:) durante a { imprimir ¡5! :) booleana y:) y = x==2:) si y {a = mentira:)} sino {x = x + 1:)}}"
-    -- let input = "imprimir¡50!:) hilo{ imprimir¡60!:) hilo{imprimir¡70!:)} hilo{imprimir¡80!:)} } esperamos:) imprimir¡90!:)"
-    -- case parseMyLang input of
-    --     Left err -> error (show err)
-    --     --Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
-    --     Right ast -> let prog = codeGen ast in run [prog,prog,prog,prog]
-    --     --Right ast -> print (codeGen ast)
-
-    --runFromFile "bank.hola"
-
-    -- do 
-        
-    --     let prog = "array entero arr:) arr = [1,2,3]:) entero x:) x = arr[1]:)"
-    --     let ast = case parseMyLang prog of
-    --             (Left _) -> error "Parse error"
-    --             (Right tree) -> tree
-
-    --     print (firstPassGeneration ast 0)
-
-showLocalMem :: DbgInput -> String
-showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
-
-
-showGlobalMem :: DbgInput -> String
-showGlobalMem ( _ , systemState ) = show $ sharedMem $ systemState
-
-
-runFromFile :: String->IO ()
-runFromFile fname = do
-    input <- readFile fname
-    case parseMyLang input of
-        Left err -> error (show err)
-        --Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
-        Right ast -> let prog = codeGen ast in run [prog,prog,prog,prog]
-        --Right ast -> print ast
-
-
---
--- SEMANTIC ERRORS
---
--- Testing for semantic errors
--- This class of errors is about run-time behaviour. Typically, you should include programs that are supposed
--- to run correctly and of which the expected outcome is known, as well as programs that are known to contain
--- a run-time error. You may consider the following (types of) test cases:
-
-
--- • Simple algorithms that calculate some value, for instance the number of days of the month February
--- in any particular year (involving a test for leap years); whether or not a given number is prime. If you
--- have implemented arrays, the scope for algorithms of the above kind becomes much larger.
-
-
--- • An algorithm that you expect to run into an infinite loop. Note that this is problematic to test auto-
--- matically, as by definition your test will not terminate if the behaviour is as expected. In JU NIT, there
--- is a way around this: the @Test-annotation has a parameter timeout that you can set to avoid tests that
--- do not terminate; e.g.
--- @Test ( timeout = 1000)
--- public void testSomething () {
--- while (true) ;
--- }
--- will cause the method testSomething to terminate after 1000 milliseconds and flag an error.
-
-
--- • Algorithms that you expect to generate a run-time error, for instance division by zero.
--- In the test suite for this class of errors, ideally every feature of your language should occur at least once in a
--- correctly running program (meaning that you actually test whether correct code is generated for that feature,
--- at least in the particular context of your test). The test involves both running the compiler, including code
--- generation, and running the generated code on the S PROCKELL virtual machine.
+        parserSpec
+        typeCheckerSpec
+        codeGenSpec
+        runtimeSpec
+        extendedTest

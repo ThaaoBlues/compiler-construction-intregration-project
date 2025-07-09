@@ -6,10 +6,10 @@ cabal-version: 1.12
 
 name:           my-lang
 version:        0.1.0.0
-description:    Implementation of MyLang.
-author:         My Name
+description:    Implementation of :D¡Queso!.
+author:         Theo Mougnibas & Iris Borgonjen
 maintainer:     my@address.here
-copyright:      2022 Author name here
+copyright:      2025 Theo Mougnibas & Iris Borgonjen
 license:        MIT
 license-file:   LICENSE
 build-type:     Simple

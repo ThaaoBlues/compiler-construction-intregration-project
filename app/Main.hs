@@ -24,10 +24,7 @@ runFromFile fname = do
     input <- readFile fname
     case parseMyLang input of
         Left err -> error (show err)
-        --Right ast -> let prog = codeGen ast in runWithDebugger (debuggerSimplePrint showGlobalMem) [prog,prog,prog]
         Right ast -> do 
-                        --print ast
-                        print (fillGlobalSymbolTable ast)
                         let tcr = stackChecking ast (fillGlobalSymbolTable ast) [fillSymbolTable ast] in
                             if null tcr 
                                 then do 
@@ -39,4 +36,3 @@ runFromFile fname = do
                                     let prog = codeGen ast in run [prog | i <- [0..threadsNumber]]
                                 else print $ show tcr
         
-        --Right ast -> print ast

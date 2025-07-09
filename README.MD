@@ -15,7 +15,7 @@ This project implements a custom programming language with a focus on basic type
 ### Compile a given file and start program on Sprockells
 
 ```bash 
-stack run file_name.whatever_extension
+stack run -- file_name.whatever_extension
 ```
 It is possible to use whatever file you want to write code in it as long as it contains brut text.
 Number of threads (and by extension, required Sprockells) should be automatically determined by the compiler.
@@ -145,13 +145,4 @@ stack test
 ```
 
 The tests are automated and designed to be self-documenting with descriptive names and comments explaining the expected behavior.
-
-## Problems Encountered
-
-2. **Lack of Sprockell Documentation**: Made it challenging to implement certain features.
-3. **Negating Booleans**: Implemented using an if-else construct due to the lack of a native NOT operator.
-4. **Generating If/Else Statements**: Required a workaround due to the behavior of the branch instruction.
-5. **Generating Multithreading Jumps/Initialization**: Required detailed planning and storage of thread information.
-6. **Joining Threads**: Implemented using a shared counter and lock for synchronization.
-7. **Implementing Locks**: Used the SPRIL "TestAndSet" atomic instruction for lock implementation.
 

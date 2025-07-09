@@ -510,8 +510,3 @@ codeGen ss = do
   let header = buildHeader tt
   header ++ body
 
-
--- TODO : tests
-
--- testAndSet atomically sets a variable to 1 if it is 0.
--- if it was already 1 
